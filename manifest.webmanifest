@@ -1,0 +1,16 @@
+{
+  "name": "ProMuebles Pedidos",
+  "short_name": "ProMuebles",
+  "description": "Pedidos, entregas y producción de ProMuebles",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#fffdf9",
+  "theme_color": "#773e13",
+  "lang": "es-AR",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
+  ]
+}

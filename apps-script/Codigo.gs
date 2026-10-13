@@ -21,7 +21,8 @@ const COLS = [
   ['id', 'N.º', 70], ['creado', 'Fecha de venta', 110], ['nombre', 'Cliente', 170], ['tel', 'Teléfono', 120],
   ['dir', 'Dirección', 200], ['barrio', 'Barrio', 130], ['zona', 'Zona', 130], ['origen', 'Origen', 115],
   ['modelo', 'Modelo', 100], ['tam', 'Tamaño', 105], ['color', 'Color', 110], ['cierre', 'Cierre suave', 95],
-  ['precio', 'Precio', 115], ['fecha', 'Fecha de entrega', 120], ['estado', 'Estado', 105],
+  ['precio', 'Precio', 115], ['pagado', 'Ya pagado', 85], ['extra', 'Extra a cobrar', 110], ['concepto', 'Concepto del extra', 150],
+  ['fecha', 'Fecha de entrega', 120], ['estado', 'Estado', 105],
   ['entregado', 'Entregada el', 110], ['uid', 'Código interno', 10]
 ];
 const C = {}; COLS.forEach((c, i) => C[c[0]] = i);
@@ -43,6 +44,7 @@ function configurar() {
   if (p.getLastRow() === 0) {
     p.getRange(1, 1, 1, COLS.length).setValues([COLS.map(c => c[1])]);
   }
+  migrar_();
   formatoPedidos_(p);
   [H_DIARIO, H_SEMANAL, H_MENSUAL, H_MODELOS].forEach(hoja_);
   const s = hoja_(H_SUSC);
@@ -78,6 +80,7 @@ function doPost(e) {
   const lock = LockService.getScriptLock();
   lock.waitLock(20000);
   try {
+    migrar_();
     switch (req.accion) {
       case 'listar': return json_({ ok: true, pedidos: leerPedidos_() });
       case 'guardar': { const p = guardarPedido_(req.pedido); actualizarResumenes(); return json_({ ok: true, pedido: p, pedidos: leerPedidos_() }); }
@@ -98,13 +101,30 @@ const fmt_ = d => d instanceof Date ? Utilities.formatDate(d, TZ, 'yyyy-MM-dd') 
 const aFecha_ = s => { if (!s) return ''; const [y, m, d] = String(s).split('-').map(Number); return new Date(y, m - 1, d); };
 const hoyISO_ = () => Utilities.formatDate(new Date(), TZ, 'yyyy-MM-dd');
 
+// Planillas armadas antes de las columnas de cobro: las agrega sin perder datos.
+function migrar_() {
+  const h = hoja_(H_PEDIDOS);
+  if (h.getLastRow() === 0 || h.getLastColumn() < 1) return;
+  const enc = h.getRange(1, 1, 1, h.getLastColumn()).getValues()[0];
+  if (enc.indexOf('Ya pagado') !== -1 || enc.indexOf('Fecha de entrega') !== 13) return;
+  h.insertColumnsBefore(14, 3);
+  h.getRange(1, 1, 1, COLS.length).setValues([COLS.map(c => c[1])]);
+  const n = h.getLastRow() - 1;
+  if (n > 0) {
+    const org = h.getRange(2, C.origen + 1, n, 1).getValues();
+    h.getRange(2, C.pagado + 1, n, 1).setValues(org.map(r => [r[0] === 'Mercado Libre' ? 'Sí' : 'No']));
+  }
+  formatoPedidos_(h);
+}
+
 function leerPedidos_() {
   const h = hoja_(H_PEDIDOS), n = h.getLastRow() - 1;
   if (n < 1) return [];
   return h.getRange(2, 1, n, COLS.length).getValues().filter(r => r[C.uid]).map(r => ({
     uid: String(r[C.uid]), num: r[C.id], creado: fmt_(r[C.creado]), nombre: r[C.nombre], tel: String(r[C.tel]), dir: r[C.dir],
     barrio: r[C.barrio], origen: r[C.origen], modelo: r[C.modelo], tam: r[C.tam], color: r[C.color],
-    cierre: r[C.cierre] === 'Sí', precio: Number(r[C.precio]) || 0, fecha: fmt_(r[C.fecha]),
+    cierre: r[C.cierre] === 'Sí', precio: Number(r[C.precio]) || 0,
+    pagado: r[C.pagado] === 'Sí', extra: Number(r[C.extra]) || 0, concepto: String(r[C.concepto] || ''), fecha: fmt_(r[C.fecha]),
     estado: Object.keys(ESTADOS).find(k => ESTADOS[k] === r[C.estado]) || 'pedido', entregado: fmt_(r[C.entregado])
   }));
 }
@@ -115,6 +135,7 @@ function filaDe_(p, num, creado, entregadoPrevio) {
   f[C.id] = num; f[C.creado] = aFecha_(creado); f[C.nombre] = p.nombre; f[C.tel] = "'" + p.tel; f[C.dir] = p.dir;
   f[C.barrio] = p.barrio; f[C.zona] = p.zona || ''; f[C.origen] = p.origen; f[C.modelo] = p.modelo; f[C.tam] = p.tam;
   f[C.color] = p.color; f[C.cierre] = p.cierre ? 'Sí' : 'No'; f[C.precio] = Number(p.precio) || 0;
+  f[C.pagado] = p.pagado ? 'Sí' : 'No'; f[C.extra] = Number(p.extra) || 0; f[C.concepto] = p.concepto || '';
   f[C.fecha] = aFecha_(p.fecha); f[C.estado] = ESTADOS[p.estado] || 'Pedido'; f[C.entregado] = aFecha_(entregado); f[C.uid] = p.uid;
   return f;
 }
@@ -157,7 +178,9 @@ function formatoPedidos_(h) {
   h.getRange(2, C.fecha + 1, filas - 1, 1).setNumberFormat('dd/mm/yyyy');
   h.getRange(2, C.entregado + 1, filas - 1, 1).setNumberFormat('dd/mm/yyyy');
   h.getRange(2, C.precio + 1, filas - 1, 1).setNumberFormat('"$ "#,##0');
+  h.getRange(2, C.extra + 1, filas - 1, 1).setNumberFormat('"$ "#,##0');
   h.getRange(2, C.id + 1, filas - 1, 1).setHorizontalAlignment('center');
+  h.showColumns(1, COLS.length);
   h.hideColumns(C.uid + 1);
   // Bandas alternadas
   h.getBandings().forEach(b => b.remove());

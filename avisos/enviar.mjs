@@ -16,6 +16,8 @@ const llamar = async (accion, extra = {}) => {
 
 const hoy = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Argentina/Buenos_Aires' });
 const dias = iso => Math.round((Date.parse(iso + 'T00:00:00Z') - Date.parse(hoy + 'T00:00:00Z')) / 864e5);
+const aCobrar = p => ((p.pagado === undefined ? p.origen === 'Mercado Libre' : p.pagado) ? 0 : Number(p.precio) || 0) + (Number(p.extra) || 0);
+const plata = n => '$ ' + n.toLocaleString('es-AR');
 const ESTADO = { pedido: 'todavía en pedido', armado: 'todavía en armado' };
 
 const { pedidos } = await llamar('listar');
@@ -27,7 +29,7 @@ for (const p of pedidos) {
   const d = dias(p.fecha);
   if (d !== 4 && d !== 2) continue;
   const cama = `${p.modelo} ${p.tam}`;
-  const aparte = ESTADO[p.estado] ? ` · ${ESTADO[p.estado]}` : '';
+  const aparte = (ESTADO[p.estado] ? ` · ${ESTADO[p.estado]}` : '') + (aCobrar(p) > 0 ? ` · COBRAR ${plata(aCobrar(p))}` : '');
   avisos.push(d === 2
     ? { title: 'ENTREGA EN 48 HS', body: `${p.nombre} · ${cama} · entrega en ${p.barrio}${aparte}`, uid: p.uid, urgente: true }
     : { title: 'Entrega en 4 días', body: `Quedaste con ${p.nombre} · ${cama} · entrega en ${p.barrio}${aparte}`, uid: p.uid });

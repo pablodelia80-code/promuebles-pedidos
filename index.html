@@ -135,6 +135,10 @@ button{cursor:pointer;border:0;background:none}
 .cobrar small{display:block;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.08em}
 .cobrar b{font-family:var(--f-titulo);font-size:26px;font-weight:800;font-variant-numeric:tabular-nums}
 .cobrar .fecha-ent{text-align:right;font-size:13px;font-weight:600}
+.cobrar-det{font-size:13px;font-weight:500;margin-top:4px}
+.cobrar-ok{background:var(--suave)}
+.cobrar-ok b{font-size:20px}
+.cobrar-chip{background:var(--dorado-tostado);color:var(--marron);font-weight:700;padding:2px 8px;border-radius:6px;font-size:12px}
 
 .pasos{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
 .paso{padding:12px 4px;border-radius:12px;border:1.5px solid var(--linea);font-size:12.5px;font-weight:600;background:var(--papel);line-height:1.2}
@@ -379,6 +383,8 @@ const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&
 const plata=n=>'$ '+Number(n||0).toLocaleString('es-AR');
 const estadoDe=id=>ESTADOS.find(e=>e.id===id)||ESTADOS[0];
 const camaTxt=p=>p.modelo+' '+p.tam;
+const estaPagado=p=>p.pagado===undefined?p.origen==='Mercado Libre':!!p.pagado;
+const aCobrar=p=>(estaPagado(p)?0:(Number(p.precio)||0))+(Number(p.extra)||0);
 function diasHasta(iso){if(!iso)return null;const a=new Date(hoyISO()+'T00:00'),b=new Date(iso+'T00:00');return Math.round((b-a)/864e5)}
 function cuando(iso){
   const d=diasHasta(iso); if(d===null)return 'Sin fecha';
@@ -431,7 +437,7 @@ function tarjeta(p){
     '<div class="ped-nom">'+esc(p.nombre)+'</div>'+
     '<div class="ped-fecha">'+esc(cuando(p.fecha))+'</div>'+
     '<div class="ped-cama">'+esc(camaTxt(p))+' · '+esc(p.color)+(p.cierre?' · Cierre suave':'')+'</div><div></div>'+
-    '<div class="ped-meta"><span class="estado '+e.cls+'">'+e.txt+'</span><span class="origen">'+esc(p.origen)+'</span><span>'+esc(p.barrio)+'</span>'+(p.num?'<span>N.º '+esc(p.num)+'</span>':'')+'</div>'+
+    '<div class="ped-meta"><span class="estado '+e.cls+'">'+e.txt+'</span><span class="origen">'+esc(p.origen)+'</span><span>'+esc(p.barrio)+'</span>'+(aCobrar(p)>0&&p.estado!=='entregada'?'<span class="cobrar-chip">Cobrar '+plata(aCobrar(p))+'</span>':'')+(p.num?'<span>N.º '+esc(p.num)+'</span>':'')+'</div>'+
   '</button>';
 }
 function vPedidos(){
@@ -450,21 +456,30 @@ function vPedidos(){
 }
 
 // ---------- Pantalla: Ficha ----------
+function bloqueCobro(p){
+  const total=aCobrar(p), pag=estaPagado(p), ex=Number(p.extra)||0;
+  const fecha='<div class="fecha-ent">'+(p.fecha?esc(cuando(p.fecha))+'<br>'+esc(fechaCorta(p.fecha)):'Sin fecha')+'</div>';
+  if(total>0){
+    const lineas=(pag?'<div>Cama: ya está paga</div>':'<div>Cama: '+plata(p.precio)+'</div>')+(ex?'<div>'+esc(p.concepto||'Extra')+': '+plata(ex)+'</div>':'');
+    return '<div class="cobrar"><div><small>¡Cobrar en la entrega!</small><b>'+plata(total)+'</b><div class="cobrar-det">'+lineas+'</div></div>'+fecha+'</div>';
+  }
+  return '<div class="cobrar cobrar-ok"><div><small>Pagado</small><b>Nada que cobrar</b><div class="cobrar-det">'+(p.origen==='Mercado Libre'?'Ya lo pagó por Mercado Libre':'Ya está pagado')+'</div></div>'+fecha+'</div>';
+}
 function vFicha(id){
   const p=pedidos.find(x=>x.id===id); if(!p){vista={tab:'pedidos'};return vPedidos()}
   const iEst=ESTADOS.findIndex(e=>e.id===p.estado);
   return cab('',true)+'<main class="cont">'+
     '<section class="cliente" aria-label="Cliente">'+
       '<div><div class="cliente-nom">'+esc(p.nombre)+'</div></div>'+
-      '<div class="dato">'+I.tel+'<span>'+esc(p.tel)+'</span></div>'+
+      '<div class="dato">'+I.tel+'<span>'+esc(p.tel||'Sin teléfono (Mercado Libre no lo comparte)')+'</span></div>'+
       '<div class="dato">'+I.mapa+'<span>'+esc(p.dir)+'<small>'+esc(p.barrio)+(zonaDe(p.barrio)?' · '+esc(zonaDe(p.barrio)):'')+'</small></span></div>'+
-      '<div class="acciones"><a class="btn btn-wa" href="'+waLink(p)+'" target="_blank" rel="noopener">'+I.wa+'WhatsApp</a><a class="btn btn-mapa" href="'+mapaLink(p)+'" target="_blank" rel="noopener">'+I.mapa+'Cómo llegar</a></div>'+
+      '<div class="acciones">'+(p.tel?'<a class="btn btn-wa" href="'+waLink(p)+'" target="_blank" rel="noopener">'+I.wa+'WhatsApp</a>':'<span class="btn btn-wa" aria-disabled="true">'+I.wa+'Sin teléfono</span>')+'<a class="btn btn-mapa" href="'+mapaLink(p)+'" target="_blank" rel="noopener">'+I.mapa+'Cómo llegar</a></div>'+
     '</section>'+
     '<section class="bloque" aria-label="La cama"><h2>La cama</h2><div class="cama-titulo">'+esc(camaTxt(p))+'</div>'+
       '<div class="specs"><div class="spec"><small>Modelo</small><b>'+esc(p.modelo)+'</b></div><div class="spec"><small>Tamaño</small><b>'+esc(p.tam)+'</b></div><div class="spec"><small>Color</small><b>'+esc(p.color)+'</b></div><div class="spec"><small>Cierre suave</small><b>'+(p.cierre?'Sí':'No')+'</b></div></div>'+
       '<div class="nota">Origen: <b>'+esc(p.origen)+'</b>'+(p.num?' · Pedido N.º '+esc(p.num):'')+(p.creado?' · Vendido el '+esc(fechaCorta(p.creado)):'')+'</div>'+
     '</section>'+
-    '<div class="cobrar"><div><small>A cobrar en la entrega</small><b>'+plata(p.precio)+'</b></div><div class="fecha-ent">'+(p.fecha?esc(cuando(p.fecha))+'<br>'+esc(fechaCorta(p.fecha)):'Sin fecha')+'</div></div>'+
+    bloqueCobro(p)+
     '<section class="bloque" aria-label="Estado"><h2>¿En qué está?</h2><div class="pasos" role="group" aria-label="Estado del pedido">'+
       ESTADOS.map((e,i)=>'<button class="paso'+(i<iEst?' hecho':'')+'" type="button" data-estado="'+e.id+'" aria-pressed="'+(i===iEst)+'">'+e.txt+'</button>').join('')+
     '</div></section>'+
@@ -481,7 +496,7 @@ function vFicha(id){
 let borrador=null;
 function nuevoBorrador(id){
   const p=id&&pedidos.find(x=>x.id===id);
-  borrador=p?{...p}:{id:null,nombre:'',tel:'',dir:'',barrio:'',origen:'WhatsApp',modelo:'',tam:'',color:'Blanco',cierre:false,precio:'',fecha:enDias(7),estado:'pedido'};
+  borrador=p?{...p,pagado:estaPagado(p),extra:p.extra||'',concepto:p.concepto||''}:{id:null,nombre:'',tel:'',dir:'',barrio:'',origen:'WhatsApp',modelo:'',tam:'',color:'Blanco',cierre:false,precio:'',pagado:false,extra:'',concepto:'',fecha:enDias(7),estado:'pedido'};
 }
 function chips(campo,opts,valor,deshab){
   return '<div class="chips'+(campo==='modelo'?' chips-grandes':'')+'" role="group">'+opts.map(o=>{
@@ -505,6 +520,10 @@ function vForm(){
     '<div class="etiqueta">Entrega</div>'+
     '<div class="dos"><div class="campo"><label for="f-fecha">Fecha de entrega</label><input id="f-fecha" name="fecha" type="date" value="'+esc(b.fecha)+'"></div>'+
     '<div class="campo"><label for="f-precio">Precio acordado</label><input id="f-precio" name="precio" inputmode="numeric" placeholder="$ 0" value="'+(b.precio?esc(plata(b.precio)):'')+'"></div></div>'+
+    '<div class="etiqueta">Cobro</div>'+
+    '<div class="campo"><span class="lbl">¿La cama ya está pagada?</span>'+chips('pagado',[{v:true,t:'Sí, ya está paga'},{v:false,t:'No, se cobra en la entrega'}],b.pagado)+'</div>'+
+    '<div class="dos"><div class="campo"><label for="f-extra">Extra a cobrar en la entrega</label><input id="f-extra" name="extra" inputmode="numeric" placeholder="$ 0" value="'+(b.extra?esc(plata(b.extra)):'')+'"></div>'+
+    '<div class="campo"><label for="f-concepto">¿Qué es?</label><input id="f-concepto" name="concepto" autocomplete="off" placeholder="Color, envío…" value="'+esc(b.concepto||'')+'"></div></div>'+
     '<div class="error" id="f-error" hidden></div>'+
     '<button class="btn btn-dorado btn-ancho" type="submit" style="font-family:var(--f-titulo);font-weight:800;font-size:16px;min-height:54px">Guardar pedido</button>'+
   '</form></main>';
@@ -553,7 +572,7 @@ function vEntregas(){
     return '<div class="etiqueta">'+esc(tit)+'</div>'+Object.keys(zonas).map(z=>
       '<div class="zona"><h3>'+esc(z)+' <span>'+zonas[z].length+(zonas[z].length>1?' entregas, un solo viaje':' entrega')+'</span></h3>'+
       zonas[z].map(p=>'<div class="entrega"><button class="txt" type="button" data-ficha="'+p.id+'"><b>'+esc(p.nombre)+'</b><span>'+esc(camaTxt(p))+' · '+esc(p.dir)+', '+esc(p.barrio)+'</span><br><span class="estado '+estadoDe(p.estado).cls+'" style="margin-top:4px">'+estadoDe(p.estado).txt+'</span></button>'+
-        '<a class="mini mini-wa" href="'+waLink(p)+'" target="_blank" rel="noopener" aria-label="WhatsApp de '+esc(p.nombre)+'">'+I.wa+'</a>'+
+        (p.tel?'<a class="mini mini-wa" href="'+waLink(p)+'" target="_blank" rel="noopener" aria-label="WhatsApp de '+esc(p.nombre)+'">'+I.wa+'</a>':'')+
         '<a class="mini mini-mapa" href="'+mapaLink(p)+'" target="_blank" rel="noopener" aria-label="Cómo llegar a '+esc(p.dir)+'">'+I.mapa+'</a></div>').join('')+'</div>').join('');
   }).join('');
   return cab('Entregas')+'<main class="cont">'+
@@ -606,6 +625,7 @@ function cerrarHoja(){$('#capa').innerHTML=''}
 function toast(t){const d=document.createElement('div');d.className='toast';d.textContent=t;document.body.appendChild(d);setTimeout(()=>d.remove(),2200)}
 
 function mensaje(p,tipo){
+  if(!p.tel){const m=tipo==='confirmar'?msgConfirmar(p):tipo==='lista'?msgLista(p):msgResena(p).replace(': ',': [link de Google] ');hoja({titulo:'Mandalo por el chat de Mercado Libre',texto:'Esta venta no tiene teléfono.',msg:m});return}
   if(tipo==='confirmar') hoja({titulo:'Confirmarle el pedido a '+nombrePila(p),msg:msgConfirmar(p),boton:'Abrir en WhatsApp',href:waLink(p,msgConfirmar(p))});
   if(tipo==='lista') hoja({titulo:'Avisarle a '+nombrePila(p)+' que está lista',msg:msgLista(p),boton:'Abrir en WhatsApp',href:waLink(p,msgLista(p))});
   if(tipo==='resena'){
@@ -678,8 +698,9 @@ document.addEventListener('click',ev=>{
   }
   if(d.chip){
     leerCampos();
-    let v=d.val; if(d.chip==='cierre') v=(v==='true');
+    let v=d.val; if(d.chip==='cierre'||d.chip==='pagado') v=(v==='true');
     borrador[d.chip]=v;
+    if(d.chip==='origen') borrador.pagado=(v==='Mercado Libre');
     if(d.chip==='modelo'){const m=MODELOS[v]; if(!m.tam.includes(borrador.tam)) borrador.tam=m.tam.length===1?m.tam[0]:'';}
     const y=window.scrollY; render(); window.scrollTo(0,y);
     return;
@@ -691,18 +712,20 @@ function leerCampos(){
   const f=$('#form'); if(!f) return;
   ['nombre','tel','dir','barrio','fecha'].forEach(k=>borrador[k]=f.elements[k].value.trim());
   borrador.precio=Number(f.elements.precio.value.replace(/\D/g,''))||'';
+  borrador.extra=Number(f.elements.extra.value.replace(/\D/g,''))||'';
+  borrador.concepto=f.elements.concepto.value.trim();
 }
 function zonaTxt(b){if(!String(b||'').trim())return '';const z=zonaDe(b);return z?'Zona: <b>'+z+'</b>':'No reconozco la zona. Igual se guarda.'}
 document.addEventListener('input',ev=>{
   if(ev.target.id==='f-barrio'){$('#f-zona').innerHTML=zonaTxt(ev.target.value)}
-  if(ev.target.id==='f-precio'){const n=ev.target.value.replace(/\D/g,'');ev.target.value=n?plata(n):''}
+  if(ev.target.id==='f-precio'||ev.target.id==='f-extra'){const n=ev.target.value.replace(/\D/g,'');ev.target.value=n?plata(n):''}
 });
 document.addEventListener('submit',ev=>{
   if(ev.target.id!=='form') return;
   ev.preventDefault(); leerCampos();
   const b=borrador, falta=[];
   if(!b.nombre) falta.push('el nombre');
-  if(!b.tel) falta.push('el teléfono');
+  if(!b.tel&&b.origen!=='Mercado Libre') falta.push('el teléfono');
   if(!b.dir) falta.push('la dirección');
   if(!b.modelo) falta.push('el modelo');
   if(!b.tam) falta.push('el tamaño');

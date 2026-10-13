@@ -139,6 +139,11 @@ button{cursor:pointer;border:0;background:none}
 .cobrar-ok{background:var(--suave)}
 .cobrar-ok b{font-size:20px}
 .cobrar-chip{background:var(--dorado-tostado);color:var(--marron);font-weight:700;padding:2px 8px;border-radius:6px;font-size:12px}
+.nota-chip{border:1.5px solid var(--dorado-tostado);color:var(--marron);font-weight:700;padding:1px 7px;border-radius:6px;font-size:12px}
+.nota-pedro{background:var(--suave);border:1.5px solid var(--dorado-tostado)}
+.nota-pedro div{white-space:pre-wrap;font-size:15px}
+.campo textarea{border-radius:12px;border:1.5px solid var(--linea);background:var(--blanco);padding:10px 14px;font-size:16px;width:100%;font-family:inherit;resize:vertical}
+.campo textarea:focus{border-color:var(--marron-claro);outline:none;box-shadow:0 0 0 3px var(--suave)}
 
 .pasos{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
 .paso{padding:12px 4px;border-radius:12px;border:1.5px solid var(--linea);font-size:12.5px;font-weight:600;background:var(--papel);line-height:1.2}
@@ -254,11 +259,11 @@ const ESTADOS = [
 // Zonas para agrupar entregas: barrio o localidad → zona
 const ZONAS = {
   'CABA Norte':['nuñez','belgrano','saavedra','coghlan','colegiales','palermo','villa urquiza','recoleta','retiro','villa pueyrredon'],
-  'CABA Centro y Oeste':['caballito','almagro','villa crespo','chacarita','paternal','agronomia','villa ortuzar','villa devoto','villa del parque','villa santa rita','villa general mitre','flores','floresta','monte castro','villa luro','versalles','liniers','velez sarsfield','balvanera','once','san nicolas','monserrat','microcentro','boedo','parque chas','villa real'],
+  'CABA Centro y Oeste':['caballito','almagro','villa crespo','chacarita','paternal','agronomia','villa ortuzar','villa devoto','villa del parque','villa santa rita','villa general mitre','flores','floresta','monte castro','villa luro','versalles','liniers','velez sarsfield','balvanera','san cristobal','once','san nicolas','monserrat','microcentro','boedo','parque chas','villa real'],
   'CABA Sur':['barracas','la boca','san telmo','constitucion','parque patricios','pompeya','nueva pompeya','parque avellaneda','mataderos','villa lugano','lugano','villa soldati','villa riachuelo','parque chacabuco','puerto madero'],
   'Zona Norte':['vicente lopez','olivos','la lucila','florida','munro','carapachay','villa martelli','villa adelina','martinez','san isidro','acassuso','beccar','boulogne','san fernando','victoria','virreyes','tigre','don torcuato','pacheco','general pacheco','benavidez','nordelta','escobar','garin','maschwitz','ingeniero maschwitz','pilar','del viso','derqui','villa rosa'],
   'Zona Noroeste':['san martin','villa ballester','san andres','jose leon suarez','3 de febrero','tres de febrero','caseros','santos lugares','ciudad jardin','saenz peña','san miguel','bella vista','muñiz','jose c. paz','jose c paz','malvinas argentinas','grand bourg','los polvorines','hurlingham','william morris'],
-  'Zona Oeste':['moron','castelar','haedo','el palomar','ituzaingo','merlo','padua','moreno','general rodriguez','marcos paz','ramos mejia','san justo','la matanza','laferrere','isidro casanova','gonzalez catan','villa luzuriaga','tapiales','ciudadela','villa madero'],
+  'Zona Oeste':['moron','castelar','haedo','el palomar','ituzaingo','merlo','padua','moreno','general rodriguez','marcos paz','ramos mejia','lomas del mirador','san justo','la matanza','laferrere','isidro casanova','gonzalez catan','villa luzuriaga','tapiales','ciudadela','villa madero'],
   'Zona Sur':['avellaneda','gerli','sarandi','wilde','dock sud','villa dominico','lanus','remedios de escalada','valentin alsina','banfield','lomas de zamora','temperley','turdera','lavallol','adrogue','burzaco','almirante brown','longchamps','glew','quilmes','bernal','ezpeleta','berazategui','florencio varela','esteban echeverria','monte grande','ezeiza','guernica','san vicente'],
   'La Plata':['la plata','city bell','gonnet','villa elisa','berisso','ensenada','tolosa']
 };
@@ -437,7 +442,7 @@ function tarjeta(p){
     '<div class="ped-nom">'+esc(p.nombre)+'</div>'+
     '<div class="ped-fecha">'+esc(cuando(p.fecha))+'</div>'+
     '<div class="ped-cama">'+esc(camaTxt(p))+' · '+esc(p.color)+(p.cierre?' · Cierre suave':'')+'</div><div></div>'+
-    '<div class="ped-meta"><span class="estado '+e.cls+'">'+e.txt+'</span><span class="origen">'+esc(p.origen)+'</span><span>'+esc(p.barrio)+'</span>'+(aCobrar(p)>0&&p.estado!=='entregada'?'<span class="cobrar-chip">Cobrar '+plata(aCobrar(p))+'</span>':'')+(p.num?'<span>N.º '+esc(p.num)+'</span>':'')+'</div>'+
+    '<div class="ped-meta"><span class="estado '+e.cls+'">'+e.txt+'</span><span class="origen">'+esc(p.origen)+'</span><span>'+esc(p.barrio)+'</span>'+(p.nota?'<span class="nota-chip">Tiene nota</span>':'')+(aCobrar(p)>0&&p.estado!=='entregada'?'<span class="cobrar-chip">Cobrar '+plata(aCobrar(p))+'</span>':'')+(p.num?'<span>N.º '+esc(p.num)+'</span>':'')+'</div>'+
   '</button>';
 }
 function vPedidos(){
@@ -479,7 +484,7 @@ function vFicha(id){
       '<div class="specs"><div class="spec"><small>Modelo</small><b>'+esc(p.modelo)+'</b></div><div class="spec"><small>Tamaño</small><b>'+esc(p.tam)+'</b></div><div class="spec"><small>Color</small><b>'+esc(p.color)+'</b></div><div class="spec"><small>Cierre suave</small><b>'+(p.cierre?'Sí':'No')+'</b></div></div>'+
       '<div class="nota">Origen: <b>'+esc(p.origen)+'</b>'+(p.num?' · Pedido N.º '+esc(p.num):'')+(p.creado?' · Vendido el '+esc(fechaCorta(p.creado)):'')+'</div>'+
     '</section>'+
-    bloqueCobro(p)+
+    (p.nota?'<section class="bloque nota-pedro" aria-label="Notas"><h2>Notas</h2><div>'+esc(p.nota)+'</div></section>':'')+bloqueCobro(p)+
     '<section class="bloque" aria-label="Estado"><h2>¿En qué está?</h2><div class="pasos" role="group" aria-label="Estado del pedido">'+
       ESTADOS.map((e,i)=>'<button class="paso'+(i<iEst?' hecho':'')+'" type="button" data-estado="'+e.id+'" aria-pressed="'+(i===iEst)+'">'+e.txt+'</button>').join('')+
     '</div></section>'+
@@ -496,7 +501,7 @@ function vFicha(id){
 let borrador=null;
 function nuevoBorrador(id){
   const p=id&&pedidos.find(x=>x.id===id);
-  borrador=p?{...p,pagado:estaPagado(p),extra:p.extra||'',concepto:p.concepto||''}:{id:null,nombre:'',tel:'',dir:'',barrio:'',origen:'WhatsApp',modelo:'',tam:'',color:'Blanco',cierre:false,precio:'',pagado:false,extra:'',concepto:'',fecha:enDias(7),estado:'pedido'};
+  borrador=p?{...p,pagado:estaPagado(p),extra:p.extra||'',concepto:p.concepto||'',nota:p.nota||''}:{id:null,nombre:'',tel:'',dir:'',barrio:'',origen:'WhatsApp',modelo:'',tam:'',color:'Blanco',cierre:false,precio:'',pagado:false,extra:'',concepto:'',nota:'',fecha:enDias(7),estado:'pedido'};
 }
 function chips(campo,opts,valor,deshab){
   return '<div class="chips'+(campo==='modelo'?' chips-grandes':'')+'" role="group">'+opts.map(o=>{
@@ -524,6 +529,8 @@ function vForm(){
     '<div class="campo"><span class="lbl">¿La cama ya está pagada?</span>'+chips('pagado',[{v:true,t:'Sí, ya está paga'},{v:false,t:'No, se cobra en la entrega'}],b.pagado)+'</div>'+
     '<div class="dos"><div class="campo"><label for="f-extra">Extra a cobrar en la entrega</label><input id="f-extra" name="extra" inputmode="numeric" placeholder="$ 0" value="'+(b.extra?esc(plata(b.extra)):'')+'"></div>'+
     '<div class="campo"><label for="f-concepto">¿Qué es?</label><input id="f-concepto" name="concepto" autocomplete="off" placeholder="Color, envío…" value="'+esc(b.concepto||'')+'"></div></div>'+
+    '<div class="etiqueta">Notas</div>'+
+    '<div class="campo"><label for="f-nota">Notas para Pedro</label><textarea id="f-nota" name="nota" rows="3" placeholder="Ej.: cajones del lado izquierdo, llamar antes de ir…">'+esc(b.nota||'')+'</textarea></div>'+
     '<div class="error" id="f-error" hidden></div>'+
     '<button class="btn btn-dorado btn-ancho" type="submit" style="font-family:var(--f-titulo);font-weight:800;font-size:16px;min-height:54px">Guardar pedido</button>'+
   '</form></main>';
@@ -714,6 +721,7 @@ function leerCampos(){
   borrador.precio=Number(f.elements.precio.value.replace(/\D/g,''))||'';
   borrador.extra=Number(f.elements.extra.value.replace(/\D/g,''))||'';
   borrador.concepto=f.elements.concepto.value.trim();
+  borrador.nota=f.elements.nota.value.trim();
 }
 function zonaTxt(b){if(!String(b||'').trim())return '';const z=zonaDe(b);return z?'Zona: <b>'+z+'</b>':'No reconozco la zona. Igual se guarda.'}
 document.addEventListener('input',ev=>{

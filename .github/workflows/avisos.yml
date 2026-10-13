@@ -1,0 +1,19 @@
+name: Avisos de entrega
+on:
+  schedule:
+    - cron: '0 11 * * *'   # 08:00 en Argentina
+  workflow_dispatch:
+jobs:
+  enviar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - run: npm install --no-audit --no-fund
+      - run: node avisos/enviar.mjs
+        env:
+          API_URL: ${{ secrets.API_URL }}
+          APP_CLAVE: ${{ secrets.APP_CLAVE }}
+          VAPID_PUBLIC: ${{ secrets.VAPID_PUBLIC }}
+          VAPID_PRIVATE: ${{ secrets.VAPID_PRIVATE }}

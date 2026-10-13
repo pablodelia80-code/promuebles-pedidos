@@ -481,7 +481,7 @@ function vFicha(id){
 let borrador=null;
 function nuevoBorrador(id){
   const p=id&&pedidos.find(x=>x.id===id);
-  borrador=p?{...p}:{id:null,nombre:'',tel:'',dir:'',barrio:'',origen:'WhatsApp',modelo:'',tam:'',color:'Blanco',cierre:false,precio:'',fecha:'',estado:'pedido'};
+  borrador=p?{...p}:{id:null,nombre:'',tel:'',dir:'',barrio:'',origen:'WhatsApp',modelo:'',tam:'',color:'Blanco',cierre:false,precio:'',fecha:enDias(7),estado:'pedido'};
 }
 function chips(campo,opts,valor,deshab){
   return '<div class="chips'+(campo==='modelo'?' chips-grandes':'')+'" role="group">'+opts.map(o=>{

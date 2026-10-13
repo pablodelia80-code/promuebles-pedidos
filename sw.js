@@ -25,7 +25,9 @@ self.addEventListener('push', e => {
     body: d.body || '',
     icon: './icons/icon-192.png',
     badge: './icons/badge-96.png',
-    tag: d.uid || undefined,
+    tag: (d.uid || 'pm') + (d.urgente ? '-48' : '-4'),
+    requireInteraction: !!d.urgente,
+    vibrate: d.urgente ? [300, 150, 300, 150, 300] : [150],
     data: { uid: d.uid || '' }
   }));
 });

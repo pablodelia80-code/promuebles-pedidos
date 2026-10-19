@@ -255,6 +255,18 @@ button{cursor:pointer;border:0;background:none}
 details summary{cursor:pointer;list-style:none}
 details summary::-webkit-details-marker{display:none}
 .chat-m{background:var(--suave);border-radius:12px;padding:8px 12px;margin-top:8px;font-size:14px}
+
+/* Formulario corto y dibujo de la cama */
+.dibujo{background:var(--blanco);border:1.5px solid var(--linea);border-radius:16px;padding:12px;text-align:center}
+.dibujo svg{width:100%;max-width:320px;height:auto;display:block;margin:0 auto}
+.dibujo .cap{font-size:12.5px;color:var(--tenue);margin-top:4px}
+.dibujo-tit{font-family:var(--f-titulo);font-weight:800;font-size:19px}
+.precio-miles{display:flex;align-items:center;gap:10px}
+.precio-miles input{max-width:140px;font-size:21px!important;font-weight:600;text-align:right}
+.mas-opc{border:1.5px dashed var(--linea);border-radius:14px;padding:12px 14px;background:var(--blanco)}
+.mas-opc summary{font-weight:600;cursor:pointer}
+.mas-opc[open] summary{margin-bottom:12px}
+.mas-opc .campo{margin-top:12px}
 </style>
 </head>
 <body>
@@ -573,7 +585,7 @@ function vFicha(id){
       '<div class="acciones">'+(p.tel?'<a class="btn btn-wa" href="'+waLink(p)+'" target="_blank" rel="noopener">'+I.wa+'WhatsApp</a>':'<span class="btn btn-wa" aria-disabled="true">'+I.wa+'Sin teléfono</span>')+'<a class="btn btn-mapa" href="'+mapaLink(p)+'" target="_blank" rel="noopener">'+I.mapa+'Cómo llegar</a></div>'+
     '</section>'+
     accionEstado+
-    '<section class="bloque" aria-label="La cama"><h2>La cama</h2><div class="cama-titulo">'+esc(camaTxt(p))+'</div>'+
+    '<section class="bloque" aria-label="La cama"><h2>La cama</h2><div class="cama-titulo">'+esc(camaTxt(p))+'</div>'+(dibujoCama(p.modelo,p.tam)?'<div class="dibujo">'+dibujoCama(p.modelo,p.tam)+'</div>':'')+
       '<div class="specs"><div class="spec"><small>Modelo</small><b>'+esc(p.modelo)+'</b></div><div class="spec"><small>Tamaño</small><b>'+esc(p.tam)+'</b></div><div class="spec"><small>Color</small><b>'+esc(p.color)+'</b></div><div class="spec"><small>Cierre suave</small><b>'+(p.cierre?'Sí':'No')+'</b></div></div>'+
       '<div class="nota">Origen: <b>'+esc(p.origen)+'</b>'+(p.num?' · Pedido N.º '+esc(p.num):'')+(/^ml\d+$/.test(String(p.id))?' · Venta ML #'+esc(String(p.id).slice(2)):'')+(p.creado?' · Vendido el '+esc(fechaCorta(p.creado)):'')+'</div>'+
     '</section>'+
@@ -588,11 +600,42 @@ function vFicha(id){
   '</main>';
 }
 
+// ---------- Dibujo de la cama (como lo hace Pedro en el cuaderno) ----------
+// Arriba la baulera de la cabecera de cada módulo, una línea hasta el botinero (B) y, entre los dos,
+// un palito por cajón hacia afuera de la cama. King = 3 módulos; 2 plazas y Queen = 2; el resto, 1.
+function dibujoCama(modelo,tam){
+  const m=MODELOS[modelo]; if(!m||!tam) return '';
+  const modulos=String(tam).startsWith('King')?3:(tam==='2 Plazas'||tam==='Queen')?2:1;
+  const n=m.cajones||0, unLado=modelo==='Esquinero', porLado=unLado?n:Math.ceil(n/2);
+  const W=330,H=230,mw=74,gap=26,total=modulos*mw+(modulos-1)*gap,x0=(W-total)/2,yR=16,hR=54,yB=166,yL=yR+hR;
+  let s='<svg viewBox="0 0 '+W+' '+H+'" xmlns="http://www.w3.org/2000/svg" fill="none" stroke="#773e13" stroke-width="3" stroke-linecap="round" aria-hidden="true">';
+  for(let i=0;i<modulos;i++){
+    const x=x0+i*(mw+gap), cx=x+mw/2;
+    s+='<rect x="'+x+'" y="'+yR+'" width="'+mw+'" height="'+hR+'" rx="6"/><line x1="'+cx+'" y1="'+yL+'" x2="'+cx+'" y2="'+yB+'"/>'+
+       '<rect x="'+(cx-20)+'" y="'+yB+'" width="40" height="40" rx="5"/><text x="'+cx+'" y="'+(yB+28)+'" text-anchor="middle" font-family="Montserrat" font-weight="800" font-size="22" fill="#773e13" stroke="none">B</text>';
+    const lados=[]; if(i===0) lados.push(-1); if(i===modulos-1&&!unLado) lados.push(1);
+    lados.forEach(l=>{ const paso=(yB-yL)/(porLado+1);
+      for(let k=1;k<=porLado;k++){ const y=yL+k*paso, x2=cx+l*30;
+        s+='<line x1="'+cx+'" y1="'+y+'" x2="'+x2+'" y2="'+y+'"/><path d="M'+(x2+l*4)+' '+(y-6)+' q '+(l*8)+' 6 0 12"/>'; } });
+  }
+  return s+'</svg>';
+}
+const COD_MODELO={'1 Plaza Vip':'1P Vip','Esquinero':'Esq','4 Vip':'4V','6 Vip':'6V','8 Vip':'8V','10 Vip':'10V','12 Vip':'12V','14 Vip':'14V','18 Vip':'18V','21 Vip':'21V','Estantes Vip':'Est'};
+const COD_TAM={'1 Plaza':'1P','Plaza y Media':'PyM','2 Plazas':'2P','Queen':'Q','King 180':'K 180','King 200':'K 200'};
+const NOTA_AGUJEROS='Agujeros en las tapas.';
+const RE_ALTURA=/\s*Altura especial: ([^.]*)\./;
+
 // ---------- Pantalla: Formulario ----------
 let borrador=null;
 function nuevoBorrador(id){
   const p=id&&pedidos.find(x=>x.id===id);
-  borrador=p?{...p,pagado:estaPagado(p),extra:p.extra||'',concepto:p.concepto||'',nota:notaImportante(p),bloqueML:(String(p.nota||'').match(BLOQUE_ML)||[''])[0]}:{id:null,nombre:'',tel:'',dir:'',barrio:'',origen:'WhatsApp',modelo:'',tam:'',color:'Blanco',cierre:false,precio:'',pagado:false,extra:'',concepto:'',nota:'',fecha:enDias(7),estado:'pedido'};
+  if(p){
+    let nota=notaImportante(p); const ag=nota.includes(NOTA_AGUJEROS); nota=nota.replace(NOTA_AGUJEROS,'');
+    const al=(nota.match(RE_ALTURA)||[])[1]||''; nota=nota.replace(RE_ALTURA,'').trim();
+    borrador={...p,quien:p.nombre,pagado:estaPagado(p),extra:p.extra||'',concepto:p.concepto||'',nota,agujeros:ag,altura:al,conAltura:!!al,bloqueML:(String(p.nota||'').match(BLOQUE_ML)||[''])[0],mas:true};
+  } else {
+    borrador={id:null,quien:'',nombre:'',tel:'',dir:'',barrio:'',origen:'WhatsApp',modelo:'',tam:'',color:'Blanco',cierre:false,precio:'',pagado:false,extra:'',concepto:'',nota:'',fecha:enDias(7),estado:'pedido',agujeros:false,altura:'',conAltura:false,mas:false};
+  }
 }
 function chips(campo,opts,valor,deshab){
   return '<div class="chips'+(campo==='modelo'?' chips-grandes':'')+'" role="group">'+opts.map(o=>{
@@ -601,29 +644,31 @@ function chips(campo,opts,valor,deshab){
 }
 function vForm(){
   const b=borrador, m=MODELOS[b.modelo];
+  const tog=(campo,t,on)=>'<button class="chip" type="button" data-toggle="'+campo+'" aria-pressed="'+(!!on)+'">'+esc(t)+'</button>';
+  const miles=b.precio?(b.precio%1000===0?b.precio/1000:b.precio):'';
   return cab(b.id?'Editar pedido':'Nuevo pedido',true)+'<main class="cont"><form class="form" id="form" novalidate>'+
-    '<div class="etiqueta">Cliente</div>'+
-    '<div class="campo"><label for="f-nombre">Nombre y apellido</label><input id="f-nombre" name="nombre" autocomplete="off" value="'+esc(b.nombre)+'"></div>'+
-    '<div class="campo"><label for="f-tel">Teléfono</label><input id="f-tel" name="tel" type="tel" inputmode="tel" placeholder="11 2345-6789" value="'+esc(b.tel)+'"></div>'+
-    '<div class="campo"><label for="f-dir">Dirección de entrega</label><input id="f-dir" name="dir" autocomplete="off" placeholder="Calle y número, piso, depto" value="'+esc(b.dir)+'"></div>'+
-    '<div class="campo"><label for="f-barrio">Barrio o localidad</label><input id="f-barrio" name="barrio" autocomplete="off" placeholder="Ej.: Núñez" value="'+esc(b.barrio)+'"><span class="nota" id="f-zona">'+zonaTxt(b.barrio)+'</span></div>'+
-    '<div class="campo"><span class="lbl">¿De dónde vino?</span>'+chips('origen',ORIGENES,b.origen)+'</div>'+
-    '<div class="etiqueta">La cama</div>'+
-    '<div class="campo"><span class="lbl">Modelo</span>'+chips('modelo',Object.keys(MODELOS),b.modelo)+'</div>'+
-    '<div class="campo"><span class="lbl">Tamaño</span>'+chips('tam',TAMANOS,b.tam,v=>!m||!m.tam.includes(v))+(m?'':'<span class="nota">Primero elegí el modelo.</span>')+'</div>'+
+    '<div class="campo"><label for="f-quien">Nombre o teléfono</label><input id="f-quien" name="quien" autocomplete="off" placeholder="Ej.: Romina 11 6574 5338" value="'+esc(b.quien||'')+'"></div>'+
+    '<div class="campo"><span class="lbl">Cajones</span>'+chips('modelo',Object.keys(MODELOS).map(k=>({v:k,t:COD_MODELO[k]||k})),b.modelo)+'</div>'+
+    '<div class="campo"><span class="lbl">Tamaño</span>'+chips('tam',TAMANOS.map(t=>({v:t,t:COD_TAM[t]||t})),b.tam,v=>!m||!m.tam.includes(v))+(m?'':'<span class="nota">Primero elegí los cajones.</span>')+'</div>'+
+    (m&&b.tam?'<div class="dibujo"><div class="dibujo-tit">'+esc(b.modelo+' '+b.tam)+(b.color!=='Blanco'?' · '+esc(b.color):'')+(b.cierre?' · CS':'')+'</div>'+dibujoCama(b.modelo,b.tam)+'<div class="cap">Se dibuja solo: cada rectángulo es un módulo, B es botinero y cada palito es un cajón.</div></div>':'')+
     '<div class="campo"><span class="lbl">Color</span>'+chips('color',COLORES,b.color)+'</div>'+
-    '<div class="campo"><span class="lbl">Cierre suave</span>'+chips('cierre',[{v:true,t:'Sí'},{v:false,t:'No'}],b.cierre)+'</div>'+
-    '<div class="etiqueta">Entrega</div>'+
-    '<div class="dos"><div class="campo"><label for="f-fecha">Fecha de entrega</label><input id="f-fecha" name="fecha" type="date" value="'+esc(b.fecha)+'"></div>'+
-    '<div class="campo"><label for="f-precio">Precio acordado</label><input id="f-precio" name="precio" inputmode="numeric" placeholder="$ 0" value="'+(b.precio?esc(plata(b.precio)):'')+'"></div></div>'+
-    '<div class="etiqueta">Cobro</div>'+
-    '<div class="campo"><span class="lbl">¿La cama ya está pagada?</span>'+chips('pagado',[{v:true,t:'Sí, ya está paga'},{v:false,t:'No, se cobra en la entrega'}],b.pagado)+'</div>'+
-    '<div class="dos"><div class="campo"><label for="f-extra">Extra a cobrar en la entrega</label><input id="f-extra" name="extra" inputmode="numeric" placeholder="$ 0" value="'+(b.extra?esc(plata(b.extra)):'')+'"></div>'+
-    '<div class="campo"><label for="f-concepto">¿Qué es?</label><input id="f-concepto" name="concepto" autocomplete="off" placeholder="Color, envío…" value="'+esc(b.concepto||'')+'"></div></div>'+
-    '<div class="etiqueta">Notas</div>'+
-    '<div class="campo"><label for="f-nota">Notas para Pedro</label><textarea id="f-nota" name="nota" rows="3" placeholder="Ej.: cajones del lado izquierdo, llamar antes de ir…">'+esc(b.nota||'')+'</textarea></div>'+
+    '<div class="campo"><span class="lbl">Extras</span><div class="chips">'+tog('cierre','CS (cierre suave)',b.cierre)+tog('agujeros','Agujeros en tapas',b.agujeros)+tog('conAltura','Altura especial',b.conAltura)+'</div>'+
+      (b.conAltura?'<input id="f-altura" name="altura" autocomplete="off" placeholder="Ej.: 35 cm" value="'+esc(b.altura||'')+'" style="margin-top:10px">':'')+'</div>'+
+    '<div class="campo"><label for="f-precio">Precio (en miles, como en el cuaderno)</label><div class="precio-miles"><input id="f-precio" name="precio" inputmode="numeric" placeholder="580" value="'+esc(String(miles))+'"><b id="f-precioTxt">'+(b.precio?'= '+plata(b.precio):'mil')+'</b></div></div>'+
+    '<div class="campo"><label for="f-barrio">Barrio</label><input id="f-barrio" name="barrio" autocomplete="off" placeholder="Ej.: Colegiales" value="'+esc(b.barrio)+'"><span class="nota" id="f-zona">'+zonaTxt(b.barrio)+'</span></div>'+
+    '<details class="mas-opc" id="f-mas"'+(b.mas?' open':'')+'><summary>+ Dirección, teléfono, entrega y cobro (opcional)</summary>'+
+      '<div class="campo"><label for="f-dir">Dirección de entrega</label><input id="f-dir" name="dir" autocomplete="off" placeholder="Calle y número, piso, depto" value="'+esc(b.dir)+'"></div>'+
+      '<div class="campo"><label for="f-tel">Teléfono</label><input id="f-tel" name="tel" type="tel" inputmode="tel" placeholder="11 2345-6789" value="'+esc(b.tel)+'"></div>'+
+      '<div class="campo"><label for="f-fecha">Fecha de entrega</label><input id="f-fecha" name="fecha" type="date" value="'+esc(b.fecha)+'"></div>'+
+      '<div class="campo"><span class="lbl">¿De dónde vino?</span>'+chips('origen',ORIGENES,b.origen)+'</div>'+
+      '<div class="campo"><span class="lbl">¿La cama ya está pagada?</span>'+chips('pagado',[{v:true,t:'Sí, ya está paga'},{v:false,t:'No, se cobra en la entrega'}],b.pagado)+'</div>'+
+      '<div class="dos"><div class="campo"><label for="f-extra">Extra a cobrar</label><input id="f-extra" name="extra" inputmode="numeric" placeholder="$ 0" value="'+(b.extra?esc(plata(b.extra)):'')+'"></div>'+
+      '<div class="campo"><label for="f-concepto">¿Qué es?</label><input id="f-concepto" name="concepto" autocomplete="off" placeholder="Color, envío…" value="'+esc(b.concepto||'')+'"></div></div>'+
+      '<div class="campo"><label for="f-nota">Nota para Pedro</label><textarea id="f-nota" name="nota" rows="3" placeholder="Ej.: cajones del lado izquierdo">'+esc(b.nota||'')+'</textarea></div>'+
+    '</details>'+
+    '<div class="nota">La fecha del pedido se pone sola. Si falta la dirección o el teléfono, la app lo marca en rojo y se completa después.</div>'+
     '<div class="error" id="f-error" hidden></div>'+
-    '<button class="btn btn-dorado btn-ancho" type="submit" style="font-family:var(--f-titulo);font-weight:800;font-size:16px;min-height:54px">Guardar pedido</button>'+
+    '<button class="btn btn-dorado btn-ancho" type="submit" style="font-family:var(--f-titulo);font-weight:800;font-size:17px;min-height:56px">Guardar pedido</button>'+
   '</form></main>';
 }
 
@@ -816,6 +861,11 @@ document.addEventListener('click',ev=>{
     hoja({titulo:'¿Borrar el pedido de '+p.nombre+'?',texto:'No se puede deshacer.',boton:'Borrar pedido',peligro:true,onOk:()=>{borrarPedido(p.id).then(ok=>{if(ok){ir({tab:'pedidos'});toast('Pedido borrado')}})}});
     return;
   }
+  if(d.toggle){
+    leerCampos(); borrador[d.toggle]=!borrador[d.toggle];
+    const y=window.scrollY; render(); window.scrollTo(0,y);
+    return;
+  }
   if(d.chip){
     leerCampos();
     let v=d.val; if(d.chip==='cierre'||d.chip==='pagado') v=(v==='true');
@@ -830,11 +880,17 @@ $('#btnNuevo').addEventListener('click',()=>{nuevoBorrador(null);ir({tab:vista.t
 
 function leerCampos(){
   const f=$('#form'); if(!f) return;
-  ['nombre','tel','dir','barrio','fecha'].forEach(k=>borrador[k]=f.elements[k].value.trim());
-  borrador.precio=Number(f.elements.precio.value.replace(/\D/g,''))||'';
-  borrador.extra=Number(f.elements.extra.value.replace(/\D/g,''))||'';
-  borrador.concepto=f.elements.concepto.value.trim();
-  borrador.nota=f.elements.nota.value.trim();
+  const v=k=>f.elements[k]?f.elements[k].value.trim():undefined;
+  ['dir','tel','barrio','fecha','concepto','nota','altura'].forEach(k=>{const x=v(k); if(x!==undefined) borrador[k]=x});
+  borrador.quien=v('quien')||'';
+  const n=Number(String(v('precio')||'').replace(/\D/g,''))||0;
+  borrador.precio=n?(n<10000?n*1000:n):'';
+  borrador.extra=Number(String(v('extra')||'').replace(/\D/g,''))||'';
+  const d=$('#f-mas'); if(d) borrador.mas=d.open;
+  // "Nombre o teléfono": si hay un número largo es el teléfono; lo demás es el nombre.
+  const q=borrador.quien, mt=q.match(/\+?\d[\d\s-]{7,}\d/);
+  if(mt){ if(!borrador.tel) borrador.tel=mt[0].replace(/\s+/g,' ').trim(); borrador.nombre=q.replace(mt[0],'').replace(/[-–,]+\s*$/,'').replace(/^\s*[-–,]+/,'').trim()||mt[0].trim(); }
+  else borrador.nombre=q;
 }
 function zonaTxt(b){if(!String(b||'').trim())return '';const z=zonaDe(b);return z?'Zona: <b>'+z+'</b>':'No reconozco la zona. Igual se guarda.'}
 document.addEventListener('input',ev=>{
@@ -844,22 +900,21 @@ document.addEventListener('input',ev=>{
     return;
   }
   if(ev.target.id==='f-barrio'){$('#f-zona').innerHTML=zonaTxt(ev.target.value)}
-  if(ev.target.id==='f-precio'||ev.target.id==='f-extra'){const n=ev.target.value.replace(/\D/g,'');ev.target.value=n?plata(n):''}
+  if(ev.target.id==='f-extra'){const n=ev.target.value.replace(/\D/g,'');ev.target.value=n?plata(n):''}
+  if(ev.target.id==='f-precio'){const n=Number(ev.target.value.replace(/\D/g,''))||0;ev.target.value=n||'';const t=$('#f-precioTxt');if(t)t.textContent=n?'= '+plata(n<10000?n*1000:n):'mil'}
 });
 document.addEventListener('submit',ev=>{
   if(ev.target.id!=='form') return;
   ev.preventDefault(); leerCampos();
   const b=borrador, falta=[];
-  if(!b.nombre) falta.push('el nombre');
-  if(!b.tel&&b.origen!=='Mercado Libre') falta.push('el teléfono');
-  if(!b.dir) falta.push('la dirección');
-  if(!b.modelo) falta.push('el modelo');
+  if(!b.nombre) falta.push('el nombre o teléfono');
+  if(!b.modelo) falta.push('los cajones');
   if(!b.tam) falta.push('el tamaño');
   if(falta.length){const e=$('#f-error');e.hidden=false;e.textContent='Falta completar '+falta.join(', ').replace(/, ([^,]*)$/,' y $1')+'.';e.scrollIntoView({block:'center'});return}
   const esNuevo=!b.id;
   if(esNuevo) b.id='p'+Date.now()+Math.random().toString(36).slice(2,6);
   const btn=ev.target.querySelector('[type=submit]'); btn.disabled=true; btn.textContent='Guardando…';
-  guardarPedido({...b,nota:(String(b.nota||'')+' '+(b.bloqueML||'')).trim()}).then(ok=>{
+  guardarPedido({...b,nota:[b.nota,b.agujeros?NOTA_AGUJEROS:'',b.conAltura&&b.altura?'Altura especial: '+b.altura+'.':'',b.bloqueML||''].filter(Boolean).join(' ').trim()}).then(ok=>{
     btn.disabled=false; btn.textContent='Guardar pedido';
     if(!ok){ if(esNuevo) b.id=null; return }
     ir({tab:vista.tab||'pedidos',ficha:b.id});

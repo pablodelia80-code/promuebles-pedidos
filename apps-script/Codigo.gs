@@ -33,6 +33,11 @@ function onOpen() {
     .addItem('1. Preparar la planilla', 'configurar')
     .addItem('Cambiar la clave de la app', 'cambiarClave')
     .addItem('Actualizar resúmenes', 'actualizarResumenes')
+    .addSeparator()
+    .addItem('Mercado Libre: guardar Secret Key', 'mlGuardarSecret')
+    .addItem('Mercado Libre: conectar', 'mlConectar')
+    .addItem('Mercado Libre: revisar ventas ahora', 'mlRevisarAhora')
+    .addItem('Mercado Libre: activar revisión cada hora', 'mlActivarRevision')
     .addToUi();
 }
 
@@ -88,7 +93,8 @@ function doPost(e) {
       case 'suscribir': suscribir_(req.dispositivo, req.suscripcion); return json_({ ok: true });
       case 'avisos': return json_({ ok: true, avisos: avisosDelDia_(), suscripciones: leerSuscripciones_() });
       case 'baja': bajaSuscripcion_(req.endpoint); return json_({ ok: true });
-      default: return json_({ ok: false, error: 'Acción desconocida' });
+      case 'ml_get': try { return json_({ ok: true, ml: mlGet_(req.ruta) }); } catch (err) { return json_({ ok: false, error: String(err.message || err) }); }
+      default: return typeof accionExtra_ === 'function' ? accionExtra_(req) : json_({ ok: false, error: 'Acción desconocida' });
     }
   } finally { lock.releaseLock(); }
 }

@@ -224,6 +224,37 @@ button{cursor:pointer;border:0;background:none}
 @keyframes sube{from{transform:translateY(30px);opacity:.4}to{transform:none;opacity:1}}
 @media (prefers-reduced-motion:reduce){.hoja{animation:none}}
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(150px + env(safe-area-inset-bottom,0px));background:var(--marron);color:var(--blanco);padding:10px 16px;border-radius:999px;font-size:14px;font-weight:500;z-index:30;max-width:calc(100% - 32px)}
+
+/* Campanita, buscador, entregada */
+.top-btns .redondo{position:relative}
+.insignia{position:absolute;top:-3px;right:-3px;min-width:19px;height:19px;padding:0 5px;border-radius:999px;background:#d93025;color:#fff;font-size:11.5px;font-weight:700;display:grid;place-items:center;line-height:1;border:2px solid var(--marron)}
+.buscador input{width:100%;min-height:50px;border-radius:14px;border:1.5px solid var(--linea);background:var(--blanco);padding:10px 14px;font-size:16px}
+.buscador input:focus{border-color:var(--marron-claro);outline:none;box-shadow:0 0 0 3px var(--suave)}
+.ped-dir{grid-column:1/-1;font-size:13.5px}
+.falta-chip{background:#fde8e6;color:#b3261e;font-weight:700;padding:1px 8px;border-radius:6px;font-size:12px}
+.falta-txt{color:#ffb4ab}
+.btn-entregar{background:var(--marron);color:var(--blanco);min-height:54px;font-family:var(--f-titulo);font-weight:800}
+.entregada-ok{background:var(--suave);border-radius:14px;padding:14px;text-align:center;font-weight:700;color:var(--tenue)}
+.notif{display:flex;gap:12px;align-items:flex-start;background:var(--blanco);border:1.5px solid var(--linea);border-radius:14px;padding:12px 14px;text-align:left;width:100%}
+.notif.nueva{border-color:var(--dorado-tostado);background:#fffaf0}
+.notif .campana{flex:none;width:36px;height:36px;border-radius:50%;background:var(--suave);display:grid;place-items:center;color:var(--marron)}
+.notif.nueva .campana{background:var(--dorado-tostado)}
+.notif .campana svg{width:19px;height:19px}
+.notif b{display:block;font-family:var(--f-titulo);font-size:13px;text-transform:uppercase;letter-spacing:.06em}
+.notif span span{display:block;font-size:14px}
+.notif small{display:block;color:var(--tenue);font-size:12px;margin-top:2px}
+
+/* Lista de pedidos: acciones rápidas, chat */
+.ped-caja{display:flex;flex-direction:column;gap:6px}
+.ped-acc{display:flex;gap:8px}
+.ped-acc .btn{flex:1;min-height:46px}
+.acc-estado{display:flex;gap:10px}
+.acc-estado .btn{flex:1}
+.cuenta{display:inline-grid;place-items:center;min-width:22px;height:22px;padding:0 6px;margin-left:4px;border-radius:999px;background:var(--suave);font-size:12px;font-weight:700}
+.filtro[aria-pressed="true"] .cuenta{background:rgba(255,255,255,.25)}
+details summary{cursor:pointer;list-style:none}
+details summary::-webkit-details-marker{display:none}
+.chat-m{background:var(--suave);border-radius:12px;padding:8px 12px;margin-top:8px;font-size:14px}
 </style>
 </head>
 <body>
@@ -252,7 +283,6 @@ const COLORES = ['Blanco','Wengue','Roble Kendall','Nogal Pacífico','Negro','Gr
 const ORIGENES = ['WhatsApp','Mercado Libre','Instagram','Web'];
 const ESTADOS = [
   {id:'pedido',   txt:'Pedido',    cls:'e-pedido'},
-  {id:'armado',   txt:'En armado', cls:'e-armado'},
   {id:'lista',    txt:'Lista',     cls:'e-lista'},
   {id:'entregada',txt:'Entregada', cls:'e-entregada'}
 ];
@@ -309,7 +339,7 @@ function enDias(n){const d=new Date();d.setDate(d.getDate()+n);return aISO(d)}
 let pedidos=[];
 try{pedidos=JSON.parse(leer('pm-cache'))||[]}catch(e){pedidos=[]}
 const alCache=()=>escribir('pm-cache',JSON.stringify(pedidos));
-function desdeServidor(lst){pedidos=(lst||[]).map(p=>({...p,id:p.uid}));alCache();cargado=true}
+function desdeServidor(lst){pedidos=(lst||[]).map(p=>({...p,id:p.uid}));alCache();cargado=true;try{generarNotifs()}catch(e){}}
 
 async function api(accion,extra){
   if(!API_URL) throw new Error('Falta conectar la planilla');
@@ -419,44 +449,104 @@ const msgResena=p=>'Hola '+nombrePila(p)+', ¿cómo va todo con la cama? Si te g
 
 // ---------- Estado de pantalla ----------
 let vista={tab:'pedidos'}; // {tab} | {ficha:id} | {form:id|null}
-let filtro='activos';
+let filtro='pedido';
 let mesCal=new Date(); mesCal.setDate(1);
 let diaSel=hoyISO();
 
 function ir(v){vista=v;render();window.scrollTo(0,0)}
+
+// ---------- Notificaciones (la campanita) ----------
+let notifs=[]; try{notifs=JSON.parse(leer('pm-notifs'))||[]}catch(e){notifs=[]}
+const guardarNotifs=()=>escribir('pm-notifs',JSON.stringify(notifs.slice(0,150)));
+const noLeidas=()=>notifs.filter(n=>!n.leida).length;
+function sumarNotif(n){ if(notifs.some(x=>x.id===n.id)) return false; notifs.unshift({...n,t:Date.now(),leida:false}); return true }
+// Se arman solas cada vez que se actualizan los pedidos: ventas nuevas, falta dirección y entregas cerca.
+function generarNotifs(){
+  if(!pedidos.length) return;
+  let vistos=null; try{vistos=JSON.parse(leer('pm-vistos'))}catch(e){}
+  const primera=!Array.isArray(vistos); if(primera) vistos=[];
+  let cambio=primera;
+  pedidos.forEach(p=>{
+    if(!vistos.includes(p.id)){
+      vistos.push(p.id);
+      if(!primera&&sumarNotif({id:'nuevo-'+p.id,tipo:'nuevo',titulo:'Venta nueva',texto:p.nombre+' · '+camaTxt(p)+' · '+plata(p.precio),uid:p.id})) cambio=true;
+    }
+    if(p.estado==='entregada') return;
+    if(p.origen==='Mercado Libre'&&!p.dir&&sumarNotif({id:'dir-'+p.id,tipo:'dir',titulo:'Falta la dirección',texto:p.nombre+': buscala en el chat del comprador',uid:p.id})) cambio=true;
+    const d=diasHasta(p.fecha); if(d===null) return;
+    let id=null,titulo=null;
+    if(d<0){id='atr-'+p.id+'-'+p.fecha;titulo='Entrega atrasada'}
+    else if(d===0){id='ent-'+p.id+'-'+p.fecha+'-0';titulo='Hoy entregás'}
+    else if(d===2){id='ent-'+p.id+'-'+p.fecha+'-2';titulo='En 48 horas entregás'}
+    else if(d===4){id='ent-'+p.id+'-'+p.fecha+'-4';titulo='En 4 días entregás'}
+    if(id&&sumarNotif({id,tipo:'entrega',titulo,texto:p.nombre+' · '+camaTxt(p)+' · '+(p.barrio||'sin barrio'),uid:p.id})) cambio=true;
+  });
+  escribir('pm-vistos',JSON.stringify(vistos));
+  if(cambio) guardarNotifs();
+}
+function hace(t){
+  const m=Math.round((Date.now()-t)/60000);
+  if(m<1) return 'ahora'; if(m<60) return 'hace '+m+' min';
+  const h=Math.round(m/60); if(h<24) return 'hace '+h+' h';
+  const d=Math.round(h/24); return 'hace '+d+(d===1?' día':' días');
+}
+function vNotif(){
+  const lst=notifs.slice().sort((a,b)=>b.t-a.t);
+  return cab('Notificaciones',true)+'<main class="cont">'+
+    (noLeidas()?'<button class="btn btn-borde btn-ancho" type="button" data-leer-todas>Marcar todas como leídas</button>':'')+
+    (!avisosActivos()?'<button class="btn btn-borde btn-ancho" type="button" data-ajustes>Activar avisos en este celular</button>':'')+
+    '<div class="lista">'+(lst.length?lst.map(n=>'<button class="notif'+(n.leida?'':' nueva')+'" type="button" data-nid="'+esc(n.id)+'"><span class="campana">'+I.campana+'</span><span><b>'+esc(n.titulo)+'</b><span>'+esc(n.texto)+'</span><small>'+esc(hace(n.t))+'</small></span></button>').join(''):'<div class="vacio">Todavía no hay notificaciones. Acá se van juntando las ventas nuevas y los avisos de entrega.</div>')+'</div></main>';
+}
+
+const BLOQUE_ML=/\[ML\][\s\S]*?\[\/ML\]/;
+const notaImportante=p=>String(p.nota||'').replace(BLOQUE_ML,'').replace(/\s+/g,' ').trim();
+const chatML=p=>{const m=String(p.nota||'').match(BLOQUE_ML); if(!m) return ''; const i=m[0].indexOf('Chat del comprador:'); return i<0?'':m[0].slice(i+19).replace(/\s*\[\/ML\]$/,'').trim()};
+const FILTROS={pedido:p=>p.estado==='pedido'||p.estado==='armado',lista:p=>p.estado==='lista',entregada:p=>p.estado==='entregada'};
+
+// ---------- Búsqueda ----------
+let busqueda='';
+const textoPedido=p=>sinAcento([p.nombre,p.tel,p.dir,p.barrio,p.zona,p.modelo,p.tam,p.color,p.origen,p.nota,p.id,String(p.id||'').replace(/^ml/,''),p.num,p.fecha,p.creado,estadoDe(p.estado).txt,p.cierre?'cierre suave':''].filter(x=>x!==undefined&&x!==null&&x!=='').join(' '));
+function listaFiltrada(){
+  const q=sinAcento(busqueda);
+  if(q) return pedidos.filter(p=>{const t=textoPedido(p);return q.split(/\s+/).every(w=>t.includes(w))}).sort((a,b)=>(a.fecha||'9').localeCompare(b.fecha||'9'));
+  const lst=pedidos.filter(FILTROS[filtro]||FILTROS.pedido);
+  if(filtro==='entregada') return lst.sort((a,b)=>String(b.entregado||b.fecha||'').localeCompare(String(a.entregado||a.fecha||'')));
+  return lst.sort((a,b)=>(a.fecha||'9').localeCompare(b.fecha||'9'));
+}
+function listaHTML(){
+  const lst=listaFiltrada();
+  return lst.length?lst.map(tarjeta).join(''):'<div class="vacio">'+(busqueda.trim()?'No encontré ningún pedido con eso.':'No hay pedidos acá. Tocá <b>Nuevo pedido</b> para cargar el primero.')+'</div>';
+}
 
 // ---------- Encabezado ----------
 function cab(titulo,conAtras){
   return '<header class="top"><div class="top-fila">'+
     (conAtras?'<button class="atras" type="button" data-atras>'+I.atras+'Volver</button>':'<div><div class="logo"><span class="pro">Pro</span><span class="mu">Muebles</span></div><div class="top-sub">Pedidos</div></div>')+
     (conAtras?'<div class="logo" style="font-size:19px"><span class="pro">Pro</span><span class="mu">Muebles</span></div>':
-      '<div class="top-btns"><button class="redondo" id="btnActualizar" type="button" data-actualizar aria-label="Actualizar">'+I.actualizar+'</button><button class="redondo" type="button" data-ajustes aria-label="Ajustes">'+I.ajustes+'</button></div>')+
+      '<div class="top-btns"><button class="redondo" type="button" data-notif aria-label="Notificaciones">'+I.campana+(noLeidas()?'<span class="insignia">'+(noLeidas()>9?'9+':noLeidas())+'</span>':'')+'</button><button class="redondo" id="btnActualizar" type="button" data-actualizar aria-label="Actualizar">'+I.actualizar+'</button><button class="redondo" type="button" data-ajustes aria-label="Ajustes">'+I.ajustes+'</button></div>')+
     '</div>'+(titulo?'<h1>'+esc(titulo)+'</h1>':'')+
     (conAtras?'':'<div class="sync'+(estadoSync==='error'?' error':'')+'" id="sync">'+textoSync()+'</div>')+'</header>';
 }
 
 // ---------- Pantalla: Pedidos ----------
 function tarjeta(p){
-  const e=estadoDe(p.estado);
-  return '<button class="ped" type="button" data-ficha="'+p.id+'">'+
+  const e=estadoDe(p.estado), ni=notaImportante(p);
+  const acc=p.estado==='entregada'?'':
+    '<div class="ped-acc">'+(p.estado==='lista'?'':'<button class="btn btn-dorado" type="button" data-lista data-id="'+esc(p.id)+'">Lista</button>')+
+    '<button class="btn btn-entregar" type="button" data-entregada data-id="'+esc(p.id)+'">Entregada</button></div>';
+  return '<div class="ped-caja"><button class="ped" type="button" data-ficha="'+p.id+'">'+
     '<div class="ped-nom">'+esc(p.nombre)+'</div>'+
-    '<div class="ped-fecha">'+esc(cuando(p.fecha))+'</div>'+
+    '<div class="ped-fecha">'+esc(p.estado==='entregada'&&p.entregado?'Entregada '+fechaCorta(p.entregado):cuando(p.fecha))+'</div>'+
     '<div class="ped-cama">'+esc(camaTxt(p))+' · '+esc(p.color)+(p.cierre?' · Cierre suave':'')+'</div><div></div>'+
-    '<div class="ped-meta"><span class="estado '+e.cls+'">'+e.txt+'</span><span class="origen">'+esc(p.origen)+'</span><span>'+esc(p.barrio)+'</span>'+(p.nota?'<span class="nota-chip">Tiene nota</span>':'')+(aCobrar(p)>0&&p.estado!=='entregada'?'<span class="cobrar-chip">Cobrar '+plata(aCobrar(p))+'</span>':'')+(p.num?'<span>N.º '+esc(p.num)+'</span>':'')+'</div>'+
-  '</button>';
+    '<div class="ped-dir"><b>Dirección:</b> '+(p.dir?esc(p.dir)+(p.barrio?', '+esc(p.barrio):''):'—')+' · <b>Tel.:</b> '+(p.tel?esc(p.tel):'—')+'</div>'+
+    '<div class="ped-meta"><span class="estado '+e.cls+'">'+e.txt+'</span>'+(p.dir?'':'<span class="falta-chip">Falta dirección</span>')+(ni?'<span class="nota-chip">Tiene nota</span>':'')+(aCobrar(p)>0&&p.estado!=='entregada'?'<span class="cobrar-chip">Cobrar '+plata(aCobrar(p))+'</span>':'')+'</div>'+
+  '</button>'+acc+'</div>';
 }
 function vPedidos(){
-  const proximos=pedidos.filter(p=>p.estado!=='entregada'&&p.fecha&&diasHasta(p.fecha)>=0&&diasHasta(p.fecha)<=3).sort((a,b)=>a.fecha.localeCompare(b.fecha));
-  const F={activos:p=>p.estado!=='entregada',pedido:p=>p.estado==='pedido',armado:p=>p.estado==='armado',lista:p=>p.estado==='lista',entregada:p=>p.estado==='entregada',todos:()=>true};
-  const lst=pedidos.filter(F[filtro]).sort((a,b)=>(a.fecha||'9').localeCompare(b.fecha||'9'));
-  if(filtro==='entregada'||filtro==='todos') lst.reverse();
-  const sinAvisos=!avisosActivos();
   return cab('')+'<main class="cont">'+
-    (sinAvisos?'<button class="aviso" type="button" data-ajustes><span class="campana">'+I.campana+'</span><span><b>Activá los avisos</b><span>Que el celular te recuerde cada entrega.</span></span></button>':'')+
-    (proximos.length?'<div class="etiqueta">Avisos de entrega</div><div class="avisos">'+proximos.map(p=>'<button class="aviso" type="button" data-ficha="'+p.id+'"><span class="campana">'+I.campana+'</span><span><b>'+esc(cuando(p.fecha))+'</b><span>'+esc(p.nombre)+' · '+esc(camaTxt(p))+' · entrega en '+esc(p.barrio)+'</span></span></button>').join('')+'</div>':'')+
-    '<div class="etiqueta">Pedidos</div>'+
-    '<div class="filtros" role="group" aria-label="Filtrar">'+[['activos','Pendientes'],['pedido','Pedido'],['armado','En armado'],['lista','Listas'],['entregada','Entregadas'],['todos','Todos']].map(([k,t])=>'<button class="filtro" type="button" data-filtro="'+k+'" aria-pressed="'+(filtro===k)+'">'+t+'</button>').join('')+'</div>'+
-    '<div class="lista">'+(lst.length?lst.map(tarjeta).join(''):'<div class="vacio">No hay pedidos acá. Tocá <b>Nuevo pedido</b> para cargar el primero.</div>')+'</div>'+
+    '<div class="buscador"><input id="buscar" type="search" inputmode="search" autocomplete="off" placeholder="Buscar: nombre, teléfono, N.º de venta, dirección…" value="'+esc(busqueda)+'" aria-label="Buscar pedido"></div>'+
+    '<div class="filtros" role="group" aria-label="Filtrar">'+[['pedido','Pedidos'],['lista','Listas'],['entregada','Entregadas']].map(([k,t])=>'<button class="filtro" type="button" data-filtro="'+k+'" aria-pressed="'+(!busqueda.trim()&&filtro===k)+'">'+t+'<span class="cuenta">'+pedidos.filter(FILTROS[k]).length+'</span></button>').join('')+'</div>'+
+    '<div class="lista" id="lista">'+listaHTML()+'</div>'+
   '</main>';
 }
 
@@ -472,27 +562,28 @@ function bloqueCobro(p){
 }
 function vFicha(id){
   const p=pedidos.find(x=>x.id===id); if(!p){vista={tab:'pedidos'};return vPedidos()}
-  const iEst=ESTADOS.findIndex(e=>e.id===p.estado);
+  const accionEstado=p.estado==='entregada'
+    ? '<div class="entregada-ok">Entregada'+(p.entregado?' el '+esc(fechaCorta(p.entregado)):'')+'</div><button class="btn btn-borde btn-ancho" type="button" data-estado="pedido">Volver a Pedidos</button>'
+    : '<div class="acc-estado">'+(p.estado==='lista'?'':'<button class="btn btn-dorado" type="button" data-estado="lista">Está lista</button>')+'<button class="btn btn-entregar" type="button" data-entregada>ENTREGADA</button></div>';
   return cab('',true)+'<main class="cont">'+
     '<section class="cliente" aria-label="Cliente">'+
       '<div><div class="cliente-nom">'+esc(p.nombre)+'</div></div>'+
-      '<div class="dato">'+I.tel+'<span>'+esc(p.tel||'Sin teléfono (Mercado Libre no lo comparte)')+'</span></div>'+
-      '<div class="dato">'+I.mapa+'<span>'+esc(p.dir)+'<small>'+esc(p.barrio)+(zonaDe(p.barrio)?' · '+esc(zonaDe(p.barrio)):'')+'</small></span></div>'+
+      '<div class="dato">'+I.tel+'<span><small>Teléfono</small>'+(p.tel?esc(p.tel):'—')+'</span></div>'+
+      '<div class="dato">'+I.mapa+'<span><small>Dirección</small>'+(p.dir?esc(p.dir):'<b class="falta-txt">Falta la dirección: buscala en el chat del comprador</b>')+'<small>'+esc(p.barrio)+(zonaDe(p.barrio)?' · '+esc(zonaDe(p.barrio)):'')+'</small></span></div>'+
       '<div class="acciones">'+(p.tel?'<a class="btn btn-wa" href="'+waLink(p)+'" target="_blank" rel="noopener">'+I.wa+'WhatsApp</a>':'<span class="btn btn-wa" aria-disabled="true">'+I.wa+'Sin teléfono</span>')+'<a class="btn btn-mapa" href="'+mapaLink(p)+'" target="_blank" rel="noopener">'+I.mapa+'Cómo llegar</a></div>'+
     '</section>'+
+    accionEstado+
     '<section class="bloque" aria-label="La cama"><h2>La cama</h2><div class="cama-titulo">'+esc(camaTxt(p))+'</div>'+
       '<div class="specs"><div class="spec"><small>Modelo</small><b>'+esc(p.modelo)+'</b></div><div class="spec"><small>Tamaño</small><b>'+esc(p.tam)+'</b></div><div class="spec"><small>Color</small><b>'+esc(p.color)+'</b></div><div class="spec"><small>Cierre suave</small><b>'+(p.cierre?'Sí':'No')+'</b></div></div>'+
-      '<div class="nota">Origen: <b>'+esc(p.origen)+'</b>'+(p.num?' · Pedido N.º '+esc(p.num):'')+(p.creado?' · Vendido el '+esc(fechaCorta(p.creado)):'')+'</div>'+
+      '<div class="nota">Origen: <b>'+esc(p.origen)+'</b>'+(p.num?' · Pedido N.º '+esc(p.num):'')+(/^ml\d+$/.test(String(p.id))?' · Venta ML #'+esc(String(p.id).slice(2)):'')+(p.creado?' · Vendido el '+esc(fechaCorta(p.creado)):'')+'</div>'+
     '</section>'+
-    (p.nota?'<section class="bloque nota-pedro" aria-label="Notas"><h2>Notas</h2><div>'+esc(p.nota)+'</div></section>':'')+bloqueCobro(p)+
-    '<section class="bloque" aria-label="Estado"><h2>¿En qué está?</h2><div class="pasos" role="group" aria-label="Estado del pedido">'+
-      ESTADOS.map((e,i)=>'<button class="paso'+(i<iEst?' hecho':'')+'" type="button" data-estado="'+e.id+'" aria-pressed="'+(i===iEst)+'">'+e.txt+'</button>').join('')+
-    '</div></section>'+
-    '<section class="bloque" aria-label="Mensajes"><h2>Mensajes al cliente</h2><div class="mensajes">'+
+    (notaImportante(p)?'<section class="bloque nota-pedro" aria-label="Notas"><h2>Notas</h2><div>'+esc(notaImportante(p))+'</div></section>':'')+bloqueCobro(p)+
+    (chatML(p)?'<section class="bloque" aria-label="Chat con el comprador"><details><summary><h2 style="display:inline">Chat con el comprador ▾</h2></summary>'+chatML(p).split(' | ').map(t=>'<div class="chat-m">'+esc(t)+'</div>').join('')+'</details></section>':'')+
+    (p.tel?'<section class="bloque" aria-label="Mensajes"><h2>Mensajes al cliente</h2><div class="mensajes">'+
       '<button class="btn btn-borde btn-ancho" type="button" data-msg="confirmar">'+I.wa+'Confirmar el pedido</button>'+
       '<button class="btn btn-borde btn-ancho" type="button" data-msg="lista">'+I.wa+'Avisar que está lista</button>'+
-      (p.estado==='entregada'?'<button class="btn btn-dorado btn-ancho" type="button" data-msg="resena">Pedir reseña</button>':'<div class="nota">El botón <b>Pedir reseña</b> aparece cuando el pedido está entregado.</div>')+
-    '</div></section>'+
+      (p.estado==='entregada'?'<button class="btn btn-dorado btn-ancho" type="button" data-msg="resena">Pedir reseña</button>':'')+
+    '</div></section>':'')+
     '<div class="pie-ficha"><button class="btn btn-borde" type="button" data-editar="'+p.id+'">Editar</button><button class="btn btn-borde" type="button" data-borrar="'+p.id+'">Borrar</button></div>'+
   '</main>';
 }
@@ -501,7 +592,7 @@ function vFicha(id){
 let borrador=null;
 function nuevoBorrador(id){
   const p=id&&pedidos.find(x=>x.id===id);
-  borrador=p?{...p,pagado:estaPagado(p),extra:p.extra||'',concepto:p.concepto||'',nota:p.nota||''}:{id:null,nombre:'',tel:'',dir:'',barrio:'',origen:'WhatsApp',modelo:'',tam:'',color:'Blanco',cierre:false,precio:'',pagado:false,extra:'',concepto:'',nota:'',fecha:enDias(7),estado:'pedido'};
+  borrador=p?{...p,pagado:estaPagado(p),extra:p.extra||'',concepto:p.concepto||'',nota:notaImportante(p),bloqueML:(String(p.nota||'').match(BLOQUE_ML)||[''])[0]}:{id:null,nombre:'',tel:'',dir:'',barrio:'',origen:'WhatsApp',modelo:'',tam:'',color:'Blanco',cierre:false,precio:'',pagado:false,extra:'',concepto:'',nota:'',fecha:enDias(7),estado:'pedido'};
 }
 function chips(campo,opts,valor,deshab){
   return '<div class="chips'+(campo==='modelo'?' chips-grandes':'')+'" role="group">'+opts.map(o=>{
@@ -613,11 +704,12 @@ function render(){
   let h;
   if(vista.ficha) h=vFicha(vista.ficha);
   else if(vista.form!==undefined) h=vForm();
+  else if(vista.notif) h=vNotif();
   else h={pedidos:vPedidos,calendario:vCalendario,entregas:vEntregas,produccion:vProduccion}[vista.tab]();
   $('#app').innerHTML=h;
   const tabActual=vista.tab||'pedidos';
-  $('#barra').innerHTML=TABS.map(([k,t,ic])=>'<button class="tab" type="button" data-tab="'+k+'"'+(!vista.ficha&&vista.form===undefined&&tabActual===k?' aria-current="page"':'')+'>'+ic+t+'</button>').join('');
-  $('#btnNuevo').hidden=vista.form!==undefined;
+  $('#barra').innerHTML=TABS.map(([k,t,ic])=>'<button class="tab" type="button" data-tab="'+k+'"'+(!vista.ficha&&vista.form===undefined&&!vista.notif&&tabActual===k?' aria-current="page"':'')+'>'+ic+t+'</button>').join('');
+  $('#btnNuevo').hidden=vista.form!==undefined||!!vista.notif||!!vista.ficha;
 }
 
 // ---------- Hoja de confirmación ----------
@@ -654,8 +746,29 @@ document.addEventListener('click',ev=>{
     else ir({tab:vista.tab||'pedidos'});
     return;
   }
-  if(d.filtro){filtro=d.filtro;render();return}
+  if(d.filtro){filtro=d.filtro;busqueda='';render();return}
   if('actualizar' in d){actualizar(false);return}
+  if('notif' in d){ir({tab:vista.tab||'pedidos',notif:true});return}
+  if('leerTodas' in d){notifs.forEach(n=>n.leida=true);guardarNotifs();render();return}
+  if(d.nid){
+    const n=notifs.find(x=>x.id===d.nid); if(n){n.leida=true;guardarNotifs()}
+    if(n&&pedidos.some(x=>x.id===n.uid)) ir({tab:vista.tab||'pedidos',ficha:n.uid}); else render();
+    return;
+  }
+  if('lista' in d){
+    const p=pedidos.find(x=>x.id===(d.id||vista.ficha)); if(!p) return;
+    const antes=p.estado; p.estado='lista'; render();
+    guardarPedido({...p}).then(ok=>{ if(!ok) p.estado=antes; render(); if(ok){ toast('Marcado como lista'); const q=pedidos.find(x=>x.id===p.id)||p; if(q.tel&&vista.ficha) mensaje(q,'lista') } });
+    return;
+  }
+  if('entregada' in d){
+    const p=pedidos.find(x=>x.id===(d.id||vista.ficha)); if(!p) return;
+    hoja({titulo:'¿Ya entregaste el pedido de '+p.nombre+'?',texto:'Pasa a la solapa Entregadas y sale de la lista de pendientes.',boton:'Sí, entregada',onOk:()=>{
+      const antes=p.estado; p.estado='entregada'; render();
+      guardarPedido({...p}).then(ok=>{ if(!ok) p.estado=antes; else if(vista.ficha) vista={tab:'pedidos'}; render(); if(ok) toast('Pedido marcado como entregado') });
+    }});
+    return;
+  }
   if('ajustes' in d){ajustes();return}
   if('activar' in d){activarAvisos();return}
   if('salir' in d){cerrarHoja();salir(false);return}
@@ -691,7 +804,7 @@ document.addEventListener('click',ev=>{
       if(!ok){p.estado=antes;render();return}
       render();
       const q=pedidos.find(x=>x.id===p.id)||p;
-      if(d.estado==='lista') mensaje(q,'lista');
+      if(d.estado==='lista'&&q.tel) mensaje(q,'lista');
       else toast('Pedido marcado como '+estadoDe(d.estado).txt.toLowerCase());
     });
     return;
@@ -725,6 +838,11 @@ function leerCampos(){
 }
 function zonaTxt(b){if(!String(b||'').trim())return '';const z=zonaDe(b);return z?'Zona: <b>'+z+'</b>':'No reconozco la zona. Igual se guarda.'}
 document.addEventListener('input',ev=>{
+  if(ev.target.id==='buscar'){
+    busqueda=ev.target.value; const l=$('#lista'); if(l) l.innerHTML=listaHTML();
+    document.querySelectorAll('.filtro').forEach(b=>b.setAttribute('aria-pressed',String(!busqueda.trim()&&b.dataset.filtro===filtro)));
+    return;
+  }
   if(ev.target.id==='f-barrio'){$('#f-zona').innerHTML=zonaTxt(ev.target.value)}
   if(ev.target.id==='f-precio'||ev.target.id==='f-extra'){const n=ev.target.value.replace(/\D/g,'');ev.target.value=n?plata(n):''}
 });
@@ -741,7 +859,7 @@ document.addEventListener('submit',ev=>{
   const esNuevo=!b.id;
   if(esNuevo) b.id='p'+Date.now()+Math.random().toString(36).slice(2,6);
   const btn=ev.target.querySelector('[type=submit]'); btn.disabled=true; btn.textContent='Guardando…';
-  guardarPedido({...b}).then(ok=>{
+  guardarPedido({...b,nota:(String(b.nota||'')+' '+(b.bloqueML||'')).trim()}).then(ok=>{
     btn.disabled=false; btn.textContent='Guardar pedido';
     if(!ok){ if(esNuevo) b.id=null; return }
     ir({tab:vista.tab||'pedidos',ficha:b.id});

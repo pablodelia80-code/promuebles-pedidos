@@ -520,10 +520,12 @@ let busqueda='';
 const textoPedido=p=>sinAcento([p.nombre,p.tel,p.dir,p.barrio,p.zona,p.modelo,p.tam,p.color,p.origen,p.nota,p.id,String(p.id||'').replace(/^ml/,''),p.num,p.fecha,p.creado,estadoDe(p.estado).txt,p.cierre?'cierre suave':''].filter(x=>x!==undefined&&x!==null&&x!=='').join(' '));
 function listaFiltrada(){
   const q=sinAcento(busqueda);
-  if(q) return pedidos.filter(p=>{const t=textoPedido(p);return q.split(/\s+/).every(w=>t.includes(w))}).sort((a,b)=>(a.fecha||'9').localeCompare(b.fecha||'9'));
+  // Lo último que se vendió, arriba; a medida que bajás, lo más viejo.
+  const masNuevo=(a,b)=>String(b.creado||'').localeCompare(String(a.creado||''))||(Number(b.num)||0)-(Number(a.num)||0);
+  if(q) return pedidos.filter(p=>{const t=textoPedido(p);return q.split(/\s+/).every(w=>t.includes(w))}).sort(masNuevo);
   const lst=pedidos.filter(FILTROS[filtro]||FILTROS.pedido);
   if(filtro==='entregada') return lst.sort((a,b)=>String(b.entregado||b.fecha||'').localeCompare(String(a.entregado||a.fecha||'')));
-  return lst.sort((a,b)=>(a.fecha||'9').localeCompare(b.fecha||'9'));
+  return lst.sort(masNuevo);
 }
 function listaHTML(){
   const lst=listaFiltrada();

@@ -97,6 +97,16 @@ button{cursor:pointer;border:0;background:none}
 .ped-cama{font-size:14px;min-width:0}
 .ped-meta{grid-column:1/-1;display:flex;gap:8px;flex-wrap:wrap;align-items:center;font-size:12.5px;color:var(--tenue);margin-top:4px}
 .ped-fecha{text-align:right;font-size:12.5px;font-weight:600;white-space:nowrap}
+.bot{display:flex;align-items:center;gap:12px;background:var(--blanco);border:1.5px solid var(--linea);border-radius:var(--radio);padding:12px 14px;text-align:left;width:100%}
+.bot-txt{flex:1;min-width:0}
+.bot-txt b{display:block;font-family:var(--f-titulo);font-size:15px}
+.bot-txt small{color:var(--tenue);font-size:12.5px}
+.bot.apagado{border-color:var(--dorado-tostado);background:#fff6df}
+.interruptor{flex:none;width:52px;height:30px;border-radius:999px;background:rgba(119,62,19,.22);position:relative;transition:background .2s}
+.interruptor::after{content:"";position:absolute;top:3px;left:3px;width:24px;height:24px;border-radius:50%;background:var(--blanco);box-shadow:0 1px 3px rgba(0,0,0,.25);transition:transform .2s}
+.bot.prendido .interruptor{background:var(--verde)}
+.bot.prendido .interruptor::after{transform:translateX(22px)}
+.bot[aria-busy="true"]{opacity:.6}
 .vacio{text-align:center;color:var(--tenue);padding:30px 10px;font-size:14px}
 
 .estado{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:999px;font-size:12px;font-weight:600;white-space:nowrap}
@@ -231,6 +241,8 @@ button{cursor:pointer;border:0;background:none}
 .buscador input{width:100%;min-height:50px;border-radius:14px;border:1.5px solid var(--linea);background:var(--blanco);padding:10px 14px;font-size:16px}
 .buscador input:focus{border-color:var(--marron-claro);outline:none;box-shadow:0 0 0 3px var(--suave)}
 .ped-dir{grid-column:1/-1;font-size:13.5px}
+.doble-chip{background:#b3261e;color:#fff;font-weight:800;padding:2px 9px;border-radius:6px;font-size:12.5px;letter-spacing:.3px}
+.doble-aviso{background:#b3261e;color:#fff;font-family:var(--f-titulo);font-weight:800;font-size:17px;text-align:center;padding:10px 12px;border-radius:var(--radio);margin:0 0 10px}
 .falta-chip{background:#fde8e6;color:#b3261e;font-weight:700;padding:1px 8px;border-radius:6px;font-size:12px}
 .falta-txt{color:#ffb4ab}
 .btn-entregar{background:var(--marron);color:var(--blanco);min-height:54px;font-family:var(--f-titulo);font-weight:800}
@@ -365,9 +377,37 @@ const textoSync=()=>estadoSync==='guardando'?'Guardando…':estadoSync==='error'
 async function actualizar(silencioso){
   if(!clave) return;
   const b=$('#btnActualizar'); if(b) b.classList.add('gira');
+  leerBot();
   try{const j=await api('listar');desdeServidor(j.pedidos);marcarSync('ok');if(!$('#form'))render()}
   catch(e){marcarSync('error');if(!silencioso)toast('No se pudo actualizar. Revisá la conexión.')}
   finally{const b2=$('#btnActualizar');if(b2)b2.classList.remove('gira')}
+}
+// ---------- Bot de WhatsApp (prender / apagar) ----------
+let bot={on:null,ocupado:false}; // on: null = no se sabe o no está conectado (no se muestra)
+function botHTML(){
+  if(bot.on===null) return '';
+  const on=bot.on;
+  return '<button class="bot '+(on?'prendido':'apagado')+'" type="button" data-bot role="switch" aria-checked="'+on+'"'+(bot.ocupado?' aria-busy="true" disabled':'')+'>'+
+    '<span class="bot-txt"><b>Bot de WhatsApp: '+(bot.ocupado?'cambiando…':on?'prendido':'apagado')+'</b>'+
+    '<small>'+(on?'Responde solo a los clientes. Tocá para apagarlo.':'No responde a nadie. Tocá para prenderlo.')+'</small></span>'+
+    '<span class="interruptor" aria-hidden="true"></span></button>';
+}
+function pintarBot(){const el=$('[data-bot]');if(el)el.outerHTML=botHTML();else if(bot.on!==null&&!$('#form'))render()}
+async function leerBot(){
+  if(bot.ocupado) return;
+  try{const j=await api('bot_estado');bot.on=!!j.on}catch(e){if(e.message==='bot_sin_configurar')bot.on=null}
+  pintarBot();
+}
+async function cambiarBot(on){
+  bot.ocupado=true;pintarBot();
+  try{const j=await api('bot_cambiar',{on});bot.on=!!j.on;toast(bot.on?'Bot prendido':'Bot apagado')}
+  catch(e){toast('No se pudo cambiar el bot. Probá de nuevo.')}
+  finally{bot.ocupado=false;pintarBot()}
+}
+function tocarBot(){
+  if(bot.ocupado||bot.on===null) return;
+  if(!bot.on){cambiarBot(true);return}
+  hoja({titulo:'¿Apagar el bot de WhatsApp?',texto:'Mientras esté apagado, el bot no le contesta a nadie. Los mensajes te llegan igual y los respondés vos.',boton:'Sí, apagar el bot',peligro:true,onOk:()=>cambiarBot(false)});
 }
 async function guardarPedido(p){
   marcarSync('guardando');
@@ -543,6 +583,8 @@ function cab(titulo,conAtras){
 }
 
 // ---------- Pantalla: Pedidos ----------
+// Pedido de varias camas iguales (ej. ML "2 unidades"): va en la nota como "Cantidad: 2 camas".
+function cantidad(p){const m=String(p.nota||'').match(/cantidad:\s*(\d+)\s*camas?/i);const n=m?Number(m[1]):1;return n>1?n:1}
 function tarjeta(p){
   const e=estadoDe(p.estado), ni=notaImportante(p);
   const acc=p.estado==='entregada'?'':
@@ -553,11 +595,11 @@ function tarjeta(p){
     '<div class="ped-fecha">'+esc(p.estado==='entregada'&&p.entregado?'Entregada '+fechaCorta(p.entregado):cuando(p.fecha))+'</div>'+
     '<div class="ped-cama">'+esc(camaTxt(p))+' · '+esc(p.color)+(p.cierre?' · Cierre suave':'')+'</div><div></div>'+
     '<div class="ped-dir"><b>Dirección:</b> '+(p.dir?esc(p.dir)+(p.barrio?', '+esc(p.barrio):''):'—')+' · <b>Tel.:</b> '+(p.tel?esc(p.tel):'—')+'</div>'+
-    '<div class="ped-meta"><span class="estado '+e.cls+'">'+e.txt+'</span>'+(p.dir?'':'<span class="falta-chip">Falta dirección</span>')+(ni?'<span class="nota-chip">Tiene nota</span>':'')+(aCobrar(p)>0&&p.estado!=='entregada'?'<span class="cobrar-chip">Cobrar '+plata(aCobrar(p))+'</span>':'')+'</div>'+
+    '<div class="ped-meta">'+(cantidad(p)>1?'<span class="doble-chip">'+cantidad(p)+' CAMAS</span>':'')+'<span class="estado '+e.cls+'">'+e.txt+'</span>'+(p.dir?'':'<span class="falta-chip">Falta dirección</span>')+(ni?'<span class="nota-chip">Tiene nota</span>':'')+(aCobrar(p)>0&&p.estado!=='entregada'?'<span class="cobrar-chip">Cobrar '+plata(aCobrar(p))+'</span>':'')+'</div>'+
   '</button>'+acc+'</div>';
 }
 function vPedidos(){
-  return cab('')+'<main class="cont">'+
+  return cab('')+'<main class="cont">'+botHTML()+
     '<div class="buscador"><input id="buscar" type="search" inputmode="search" autocomplete="off" placeholder="Buscar: nombre, teléfono, N.º de venta, dirección…" value="'+esc(busqueda)+'" aria-label="Buscar pedido"></div>'+
     '<div class="filtros" role="group" aria-label="Filtrar">'+[['pedido','Pedidos'],['lista','Listas'],['entregada','Entregadas']].map(([k,t])=>'<button class="filtro" type="button" data-filtro="'+k+'" aria-pressed="'+(!busqueda.trim()&&filtro===k)+'">'+t+'<span class="cuenta">'+pedidos.filter(FILTROS[k]).length+'</span></button>').join('')+'</div>'+
     '<div class="lista" id="lista">'+listaHTML()+'</div>'+
@@ -587,7 +629,7 @@ function vFicha(id){
       '<div class="acciones">'+(p.tel?'<a class="btn btn-wa" href="'+waLink(p)+'" target="_blank" rel="noopener">'+I.wa+'WhatsApp</a>':'<span class="btn btn-wa" aria-disabled="true">'+I.wa+'Sin teléfono</span>')+'<a class="btn btn-mapa" href="'+mapaLink(p)+'" target="_blank" rel="noopener">'+I.mapa+'Cómo llegar</a></div>'+
     '</section>'+
     accionEstado+
-    '<section class="bloque" aria-label="La cama"><h2>La cama</h2><div class="cama-titulo">'+esc(camaTxt(p))+'</div>'+(dibujoCama(p.modelo,p.tam)?'<div class="dibujo">'+dibujoCama(p.modelo,p.tam)+'</div>':'')+
+    '<section class="bloque" aria-label="La cama"><h2>La cama</h2>'+(cantidad(p)>1?'<div class="doble-aviso">Son '+cantidad(p)+' camas en este pedido</div>':'')+'<div class="cama-titulo">'+esc(camaTxt(p))+'</div>'+(dibujoCama(p.modelo,p.tam)?'<div class="dibujo">'+dibujoCama(p.modelo,p.tam)+'</div>':'')+
       '<div class="specs"><div class="spec"><small>Modelo</small><b>'+esc(p.modelo)+'</b></div><div class="spec"><small>Tamaño</small><b>'+esc(p.tam)+'</b></div><div class="spec"><small>Color</small><b>'+esc(p.color)+'</b></div><div class="spec"><small>Cierre suave</small><b>'+(p.cierre?'Sí':'No')+'</b></div></div>'+
       '<div class="nota">Origen: <b>'+esc(p.origen)+'</b>'+(p.num?' · Pedido N.º '+esc(p.num):'')+(/^ml\d+$/.test(String(p.id))?' · Venta ML #'+esc(String(p.id).slice(2)):'')+(p.creado?' · Vendido el '+esc(fechaCorta(p.creado)):'')+'</div>'+
     '</section>'+
@@ -729,12 +771,13 @@ function vEntregas(){
 // ---------- Pantalla: Producción ----------
 function vProduccion(){
   const pend=pedidos.filter(p=>p.estado==='pedido'||p.estado==='armado');
-  const cajones=pend.reduce((s,p)=>s+(MODELOS[p.modelo]?.cajones||0),0);
-  const conCierre=pend.filter(p=>p.cierre).reduce((s,p)=>s+(MODELOS[p.modelo]?.cajones||0),0);
-  const grupos={}; pend.forEach(p=>{const k=camaTxt(p)+(p.color!=='Blanco'?' · '+p.color:'');grupos[k]=(grupos[k]||0)+1});
+  const cajones=pend.reduce((s,p)=>s+(MODELOS[p.modelo]?.cajones||0)*cantidad(p),0);
+  const totalCamas=pend.reduce((s,p)=>s+cantidad(p),0);
+  const conCierre=pend.filter(p=>p.cierre).reduce((s,p)=>s+(MODELOS[p.modelo]?.cajones||0)*cantidad(p),0);
+  const grupos={}; pend.forEach(p=>{const k=camaTxt(p)+(p.color!=='Blanco'?' · '+p.color:'');grupos[k]=(grupos[k]||0)+cantidad(p)});
   const orden=pend.slice().sort((a,b)=>(a.fecha||'9').localeCompare(b.fecha||'9'));
   return cab('Para armar')+'<main class="cont">'+
-    '<div class="resumen"><div class="num"><b>'+pend.length+'</b><small>camas por armar</small></div><div class="num"><b>'+cajones+'</b><small>cajones en total</small></div></div>'+
+    '<div class="resumen"><div class="num"><b>'+totalCamas+'</b><small>camas por armar</small></div><div class="num"><b>'+cajones+'</b><small>cajones en total</small></div></div>'+
     (conCierre?'<div class="nota">De esos cajones, <b>'+conCierre+'</b> llevan cierre suave.</div>':'')+
     '<section class="bloque"><h2>Qué hay que armar</h2>'+(Object.keys(grupos).length?Object.entries(grupos).map(([k,n])=>'<div class="fila"><b>'+esc(k)+'</b><span class="cant">× '+n+'</span></div>').join(''):'<div class="vacio">No hay camas pendientes.</div>')+'</section>'+
     (orden.length?'<section class="bloque"><h2>Por fecha de entrega</h2>'+orden.map(p=>'<button class="fila" type="button" data-ficha="'+p.id+'" style="width:100%;text-align:left"><span><b>'+esc(camaTxt(p))+'</b><br><span class="nota">'+esc(p.nombre)+' · '+esc(estadoDe(p.estado).txt)+'</span></span><span class="nota" style="white-space:nowrap">'+esc(cuando(p.fecha))+'</span></button>').join('')+'</section>':'')+
@@ -795,6 +838,7 @@ document.addEventListener('click',ev=>{
   }
   if(d.filtro){filtro=d.filtro;busqueda='';render();return}
   if('actualizar' in d){actualizar(false);return}
+  if('bot' in d){tocarBot();return}
   if('notif' in d){ir({tab:vista.tab||'pedidos',notif:true});return}
   if('leerTodas' in d){notifs.forEach(n=>n.leida=true);guardarNotifs();render();return}
   if(d.nid){

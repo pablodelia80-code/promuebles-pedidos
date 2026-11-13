@@ -200,6 +200,7 @@ function accionExtra_(req) {
   try {
     switch (req.accion) {
       case 'ml_vista': return json_({ ok: true, resultado: mlSincronizar_(true) });
+      case 'bot_estado': case 'bot_cambiar': return accionBot_(req);
       case 'ml_sync': { const r = mlSincronizar_(false); return json_({ ok: true, nuevos: r.nuevos.length, actualizados: r.actualizados.length, pedidos: leerPedidos_() }); }
     }
   } catch (err) { return json_({ ok: false, error: String(err.message || err) }); }

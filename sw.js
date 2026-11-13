@@ -1,5 +1,5 @@
 // ProMuebles Pedidos: abre rápido aunque no haya señal y muestra los avisos de entrega.
-const CACHE = 'pm-app-v1';
+const CACHE = 'pm-app-v2';
 const ARCHIVOS = ['./', './index.html', './manifest.webmanifest', './icons/icon-192.png', './icons/icon-512.png', './icons/badge-96.png'];
 
 self.addEventListener('install', e => {

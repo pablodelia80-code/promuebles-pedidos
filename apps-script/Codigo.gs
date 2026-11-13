@@ -38,6 +38,8 @@ function onOpen() {
     .addItem('Mercado Libre: conectar', 'mlConectar')
     .addItem('Mercado Libre: revisar ventas ahora', 'mlRevisarAhora')
     .addItem('Mercado Libre: activar revisión cada hora', 'mlActivarRevision')
+    .addSeparator()
+    .addItem('Bot de WhatsApp: conectar', 'botGuardarClave')
     .addToUi();
 }
 

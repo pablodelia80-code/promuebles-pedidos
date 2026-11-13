@@ -241,6 +241,11 @@ button{cursor:pointer;border:0;background:none}
 .buscador input{width:100%;min-height:50px;border-radius:14px;border:1.5px solid var(--linea);background:var(--blanco);padding:10px 14px;font-size:16px}
 .buscador input:focus{border-color:var(--marron-claro);outline:none;box-shadow:0 0 0 3px var(--suave)}
 .ped-dir{grid-column:1/-1;font-size:13.5px}
+.origen-chip{display:inline-block;font-weight:800;font-size:11.5px;padding:1px 7px;border-radius:6px;margin-right:5px;vertical-align:1px;letter-spacing:.2px}
+.o-ml{background:#ffe600;color:#2d3277}
+.o-wa{background:#dcf8e6;color:#0f7a3d}
+.o-ig{background:#fde4ef;color:#b0145d}
+.o-web{background:#ece7df;color:#5b4636}
 .doble-chip{background:#b3261e;color:#fff;font-weight:800;padding:2px 9px;border-radius:6px;font-size:12.5px;letter-spacing:.3px}
 .doble-aviso{background:#b3261e;color:#fff;font-family:var(--f-titulo);font-weight:800;font-size:17px;text-align:center;padding:10px 12px;border-radius:var(--radio);margin:0 0 10px}
 .falta-chip{background:#fde8e6;color:#b3261e;font-weight:700;padding:1px 8px;border-radius:6px;font-size:12px}
@@ -666,6 +671,9 @@ function cab(titulo,conAtras){
 
 // ---------- Pantalla: Pedidos ----------
 // Pedido de varias camas iguales (ej. ML "2 unidades"): va en la nota como "Cantidad: 2 camas".
+// Etiqueta de dónde vino la venta (ML, WhatsApp, Instagram, Web).
+const ORIGEN_CHIP={'Mercado Libre':['ML','o-ml'],'WhatsApp':['WhatsApp','o-wa'],'Instagram':['Instagram','o-ig'],'Web':['Web','o-web']};
+const origenChip=p=>{const o=ORIGEN_CHIP[p.origen]; return o?'<span class="origen-chip '+o[1]+'">'+o[0]+'</span>':''};
 function cantidad(p){const m=String(p.nota||'').match(/cantidad:\s*(\d+)\s*camas?/i);const n=m?Number(m[1]):1;return n>1?n:1}
 function tarjeta(p){
   const e=estadoDe(p.estado), ni=notaImportante(p);
@@ -677,7 +685,7 @@ function tarjeta(p){
     '<div class="ped-fecha">'+esc(p.estado==='entregada'&&p.entregado?'Entregada '+fechaCorta(p.entregado):cuando(p.fecha))+'</div>'+
     '<div class="ped-cama">'+esc(camaTxt(p))+' · '+esc(p.color)+(p.cierre?' · Cierre suave':'')+'</div><div></div>'+
     '<div class="ped-dir"><b>Dirección:</b> '+(p.dir?esc(p.dir)+(p.barrio?', '+esc(p.barrio):''):'—')+' · <b>Tel.:</b> '+(p.tel?esc(p.tel):'—')+'</div>'+
-    '<div class="ped-meta">'+(cantidad(p)>1?'<span class="doble-chip">'+cantidad(p)+' CAMAS</span>':'')+'<span class="estado '+e.cls+'">'+e.txt+'</span>'+(p.dir?'':'<span class="falta-chip">Falta dirección</span>')+(ni?'<span class="nota-chip">Tiene nota</span>':'')+(aCobrar(p)>0&&p.estado!=='entregada'?'<span class="cobrar-chip">Cobrar '+plata(aCobrar(p))+'</span>':'')+'</div>'+
+    '<div class="ped-meta">'+origenChip(p)+(cantidad(p)>1?'<span class="doble-chip">'+cantidad(p)+' CAMAS</span>':'')+'<span class="estado '+e.cls+'">'+e.txt+'</span>'+(p.dir?'':'<span class="falta-chip">Falta dirección</span>')+(ni?'<span class="nota-chip">Tiene nota</span>':'')+(aCobrar(p)>0&&p.estado!=='entregada'?'<span class="cobrar-chip">Cobrar '+plata(aCobrar(p))+'</span>':'')+'</div>'+
   '</button>'+acc+'</div>';
 }
 function vPedidos(){
@@ -1018,7 +1026,7 @@ function ajustarMapa(lista){
 function sinUbicar(){return pendientesMapa().filter(p=>{const u=ubicacion(p);return u&&u.prec==='no'})}
 function filaCama(p,extra){
   return '<div class="m-fila"><span class="m-punto" style="--c:'+(seleccion.includes(p.id)?'var(--dorado)':colorDe(p))+'"></span>'+
-    '<span class="m-fila-txt"><b>'+esc(p.nombre)+'</b><small>'+(cantidad(p)>1?cantidad(p)+' camas · ':'')+esc(camaTxt(p))+' · '+esc(p.barrio||'sin barrio')+'</small></span>'+
+    '<span class="m-fila-txt"><b>'+origenChip(p)+esc(p.nombre)+'</b><small>'+(cantidad(p)>1?cantidad(p)+' camas · ':'')+esc(camaTxt(p))+' · '+esc(p.barrio||'sin barrio')+'</small></span>'+
     (extra||'')+'<button class="m-ficha" type="button" data-ficha="'+esc(p.id)+'">Ficha ›</button></div>';
 }
 function pintarPanel(){
